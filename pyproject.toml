@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mlhc-project"
+version = "0.1.0"
+description = "Bioinformatics research project for MLHC"
+requires-python = ">=3.9"
+dependencies = [
+    "pandas",
+    "google-cloud-bigquery",
+    "scikit-learn",
+    "google-auth",
+    "ipykernel>=6.29.5",
+]
+
+[tool.setuptools]
+packages = ["project"]
+
+[tool.setuptools.exclude-package-data]
+"*" = ["MLH*"] 
