@@ -6,7 +6,7 @@ This repository contains code and notes for the Machine Learning for Health Care
 2. Prolonged length of stay
 3. 30-day readmission
 
-Most of the logic lives in the [notebooks](notebooks/) folder. The `skeleton.ipynb` notebook shows the full data extraction and exploratory analysis workflow using **BigQuery**.
+Most of the logic lives in the [notebooks](notebooks/) folder. The `skeleton.ipynb` notebook provides project setup and Google Cloud authentication instructions for accessing the MIMIC-III dataset via **BigQuery**.
 
 ## Local Requirements
 
@@ -25,7 +25,7 @@ This project uses [uv](https://github.com/astral-sh/uv) for package management.
 
 ## Repository Layout
 
-- `notebooks/skeleton.ipynb` – main exploratory notebook and reference implementation.
+- `notebooks/skeleton.ipynb` – project setup and authentication guide for Google Cloud/BigQuery access.
 - `project/` – Python package with code for running the pipeline on new data.
 
 See `project/README.md` for more details on the pipeline.
