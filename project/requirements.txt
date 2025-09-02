@@ -1,4 +1,0 @@
-pandas
-google-cloud-bigquery
-scikit-learn
-google-auth
