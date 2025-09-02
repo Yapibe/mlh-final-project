@@ -115,3 +115,9 @@ The `project/unseen_data_evaluation.py` contains a template `run_pipeline_on_uns
 - Use BigQuery parameterized queries for patient cohort filtering
 - Implement preprocessing pipelines using scikit-learn transformers
 - Maintain separation between exploratory analysis (notebooks) and production code (project/)
+
+### Code Generation Guidelines
+- **Minimize verbosity**: Provide concise code with minimal print statements
+- **Skip validation prints**: Avoid extensive logging unless specifically requested
+- **Focus on functionality**: Core logic without detailed explanations in code
+- **Reduce token usage**: Eliminate redundant comments and authentication details
