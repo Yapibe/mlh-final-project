@@ -41,17 +41,16 @@ def run_pipeline_on_unseen_data(subject_ids ,client):
 	X = df.drop(columns=['hadm_id','dischtime','dod','dob','deathtime','mortality','prolonged_stay','readmission','sec_admittime'])
 	y = df[['subject_id','mortality','prolonged_stay','readmission']]
 	
-	# add missing features to the data - fill with 0s
-	missing_cols = list(set(models_params['train_features'])-set(X.columns))
-	X[missing_cols] = 0
-	# remove unknown featurs
-	X = X[models_params['train_features']]
-	
 	# Standardization (fit scaler by TRAIN data only)
 	X, _ = data_norm(X, models_params["numeric_cols"], scaler=models_params["scaler"])
 	# Imputation by first day baseline (calc baseline by TRAIN only)
 	X, _ = imputation_by_baseline(X, models_params["numeric_cols"], baseline=models_params["imputation_baseline"])
 	X = X.drop(columns=['admittime']).reset_index(drop=True)
+	# add missing features to the data - fill with 0s
+	missing_cols = list(set(models_params['train_features'])-set(X.columns))
+	X[missing_cols] = 0
+	# remove unknown featurs
+	X = X[models_params['train_features']]
 	
 	# Generate padded sequences + masks
 	X, y, mask = generate_series_data(X, y, time_col="charttime")
