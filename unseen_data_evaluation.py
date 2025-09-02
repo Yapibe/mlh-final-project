@@ -7,9 +7,9 @@ import duckdb
 from google.colab import drive
 drive.mount('/content/drive')
 
-from utils import load_file, sql_from_MIMICIII, age, ethnicity_to_ohe, split_data, data_norm, imputation_by_baseline, generate_series_data
-from config import get_config
-from preprocess_pipeline import preprocess_data
+from preprocessing.utils import load_file, sql_from_MIMICIII, age, ethnicity_to_ohe, split_data, data_norm, imputation_by_baseline, generate_series_data
+from preprocessing.config import get_config
+from preprocessing.preprocess_pipeline import preprocess_data
 
 
 def run_pipeline_on_unseen_data(subject_ids ,client):
@@ -33,7 +33,7 @@ def run_pipeline_on_unseen_data(subject_ids ,client):
 	config_dict = get_config()
 	
 	# read the full train_features list and Standardization and Imputation params from the train data 
-	with open(f"{config_dict['data_paths']['DATA_PATH']}/models_params_dict.pkl", 'rb') as f:
+	with open(f"pre-processing/{config_dict['data_paths']['DATA_PATH']}/models_params_dict.pkl", 'rb') as f:
 		models_params = pkl.load(f)
 	
 	# preprocess_data
