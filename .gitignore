@@ -28,3 +28,7 @@ notebooks/HW2
 notebooks/HW3
 
 .egg-info/
+
+# Claude Code
+.claude/
+CLAUDE.md
