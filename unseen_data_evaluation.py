@@ -45,6 +45,7 @@ def run_pipeline_on_unseen_data(subject_ids ,client):
 	X, _ = data_norm(X, models_params["numeric_cols"], scaler=models_params["scaler"])
 	# Imputation by first day baseline (calc baseline by TRAIN only)
 	X, _ = imputation_by_baseline(X, models_params["numeric_cols"], baseline=models_params["imputation_baseline"])
+	X = X.fillna(0)
 	X = X.drop(columns=['admittime']).reset_index(drop=True)
 	# add missing features to the data - fill with 0s
 	missing_cols = list(set(models_params['train_features'])-set(X.columns))
