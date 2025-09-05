@@ -69,7 +69,7 @@ def imputation_by_baseline(df, numeric_cols, baseline=None):
 
 def age(admittime, dob):
 	if admittime < dob:
-	  return 0
+		return 0
 	return admittime.year - dob.year - ((admittime.month, admittime.day) < (dob.month, dob.day))
 
 def ethnicity_to_ohe(hosps):

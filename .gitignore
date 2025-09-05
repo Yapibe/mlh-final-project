@@ -13,19 +13,12 @@ __pycache__/
 .vscode/
 .idea/
 
-# Data
-data/
-
 # Results
 results/
 
 # Models
 models/
 
-# Notebooks
-notebooks/HW1
-notebooks/HW2
-notebooks/HW3
 
 .egg-info/
 
