@@ -7,7 +7,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from dataset import TimeSeriesDataset
 
-from sklearn.metrics import roc_auc_score, average_precision_score, brier_score_loss, roc_curve, precision_recall_curve, confusion_matrix, precision_recall_fscore_support, ConfusionMatrixDisplay
+from sklearn.metrics import roc_auc_score, average_precision_score, accuracy_score, f1_score, roc_curve, precision_recall_curve, confusion_matrix, precision_recall_fscore_support, ConfusionMatrixDisplay
 
 from sklearn.neighbors import NearestNeighbors
 
