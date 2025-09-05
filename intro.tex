@@ -1,0 +1,79 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage{cite}
+\usepackage{url}
+
+\title{ICU Prediction Models for Critical Clinical Outcomes Using MIMIC-III Data}
+\author{Machine Learning for Healthcare Final Project\\
+Course 0368-4273}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+
+Critical care medicine relies heavily on early identification of patients at risk for adverse outcomes to guide clinical decision-making and resource allocation. This project addresses the challenge of predicting three key clinical outcomes in the intensive care unit (ICU) setting: in-hospital mortality, prolonged length of stay, and hospital readmission within 30 days of discharge.
+
+Using a subset of the Medical Information Mart for Intensive Care III (MIMIC-III) database, we develop an end-to-end machine learning pipeline that leverages multimodal clinical data collected during the first 48 hours of hospitalization to predict these outcomes. MIMIC-III is a comprehensive, freely-available database containing de-identified health records of over 40,000 patients who stayed in critical care units at Beth Israel Deaconess Medical Center between 2001 and 2012.
+
+\subsection{Clinical Motivation}
+
+Early risk stratification in the ICU is crucial for several reasons:
+\begin{itemize}
+    \item \textbf{Mortality prediction} enables clinicians to identify high-risk patients who may benefit from more aggressive interventions or palliative care discussions
+    \item \textbf{Prolonged stay prediction} (length of stay $>$ 7 days) aids in resource planning and discharge coordination
+    \item \textbf{Readmission prediction} supports targeted interventions to reduce healthcare costs and improve patient outcomes
+\end{itemize}
+
+\subsection{Technical Approach}
+
+Our approach implements a multi-target prediction framework using data collected within the first 48 hours of admission, with a 6-hour prediction gap to ensure clinical applicability. The pipeline incorporates:
+
+\begin{enumerate}
+    \item \textbf{Multimodal Feature Extraction}: Demographic information, vital signs, laboratory results, and additional clinical data modalities
+    \item \textbf{Temporal Modeling}: Time-series representation of patient data to capture dynamic clinical patterns
+    \item \textbf{Multi-target Learning}: Simultaneous prediction of three clinical outcomes with calibrated probability outputs
+    \item \textbf{Interpretability Analysis}: Feature importance assessment using explainable AI methods
+\end{enumerate}
+
+\subsection{Dataset and Prediction Timeline}
+
+We utilize a predefined patient subsample from MIMIC-III, focusing exclusively on first hospital admissions for patients with at least 54 hours of hospitalization data. The prediction timeline follows a structured approach:
+
+\begin{itemize}
+    \item \textbf{Prediction time}: 48 hours after admission ($t = 48h$)
+    \item \textbf{Input window}: Data collected during first 48 hours only
+    \item \textbf{Prediction gap}: 6-hour buffer to prevent data leakage
+    \item \textbf{Target definitions}:
+    \begin{itemize}
+        \item Mortality: Death during hospitalization or within 30 days of discharge
+        \item Prolonged stay: Length of stay exceeding 7 days
+        \item Readmission: Hospital readmission within 30 days of discharge
+    \end{itemize}
+\end{itemize}
+
+\subsection{Implementation Framework}
+
+The project is implemented in Python using modern machine learning libraries including scikit-learn, pandas, and Google Cloud BigQuery for data access. The codebase includes comprehensive preprocessing utilities, model training pipelines, and evaluation frameworks designed for both development and deployment on unseen data.
+
+Our implementation follows best practices for clinical machine learning, including proper data partitioning to prevent leakage, calibrated probability outputs for clinical interpretation, and comprehensive evaluation metrics including classification performance, calibration analysis, and feature importance assessment.
+
+\subsection{Expected Contributions}
+
+This work contributes to the field of clinical prediction modeling by:
+\begin{itemize}
+    \item Demonstrating effective multi-target prediction in the ICU setting using early hospitalization data
+    \item Providing a robust, reproducible pipeline for clinical outcome prediction
+    \item Offering insights into the most predictive features for each clinical outcome
+    \item Establishing a framework for early risk stratification that can inform clinical decision-making
+\end{itemize}
+
+The following sections detail our methodology, experimental setup, results, and clinical implications of this multi-target ICU prediction system.
+
+\end{document}
