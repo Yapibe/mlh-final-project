@@ -70,20 +70,17 @@ def train_multitask_seq_ae(
 			sup_rare = SupConLoss(temperature=temperature, anchor_mode="positives")  # rare
 			sup_5050 = SupConLoss(temperature=temperature, anchor_mode="both")       # ~50/50
 			
-			# compute projection once
-			e = F.normalize(model.proj(z), p=2, dim=1)
 			# gentle class-imbalance weights from pos_weights
 			task_w = (pos_weights / pos_weights.mean()).pow(0.5).detach()
 			
 			# automaticaly append prolonged_stay (~50/50)
-			sup_terms = [sup_5050(e, yb[:, 0])]
+			sup_terms = [sup_5050(model.project(z, 1), yb[:, 0])]
 			sup_weights = [task_w[0]]
 			# for each of the rare cases append only if there are anchors (pos samples) in the batch 
 			for i in [1,2]:
 				if (yb[:, i].sum() >= 2):
-					sup_terms.append(sup_rare(model.proj(z), yb[:, i]))
+					sup_terms.append(sup_rare(model.project(z, i), yb[:, i]))
 					sup_weights.append(task_w[i])
-						
 			
 			w = torch.stack(sup_weights)
 			w = w / w.sum() # normalize so total weight = 1

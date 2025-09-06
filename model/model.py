@@ -22,12 +22,13 @@ class MultiTaskSeqGRUAE(nn.Module):
 		# turn the encoder’s hidden vector into latent size
 		self.to_latent = nn.Linear(enc_hidden, latent_dim)
 
-		# projection head for contrastive learning - 2-layer MLP 
-		self.proj = nn.Sequential(
-			nn.Linear(latent_dim, SupCon_latent_dim),
-			nn.ReLU(inplace=True),
-			nn.Linear(SupCon_latent_dim, SupCon_latent_dim)
-		)
+		# projection head for contrastive learning - 2-layer MLP for each task 
+		self.proj_heads = nn.ModuleList([
+			nn.Sequential(
+				nn.Linear(latent_dim, SupCon_latent_dim), 
+				nn.ReLU(inplace=True), 
+				nn.Linear(SupCon_latent_dim, SupCon_latent_dim)) 
+			for _ in range(3)])
 
 		# three classifiers (separate linear heads - one per task) from shared latent z
 		self.cls_heads = nn.ModuleList([nn.Linear(latent_dim, 1) for _ in range(3)])
@@ -71,3 +72,8 @@ class MultiTaskSeqGRUAE(nn.Module):
 		logits = [head(z).squeeze(-1) for head in self.cls_heads] 
 		x_hat = self.decode(z, T)
 		return z, logits, x_hat
+		
+	def project(self, z, k):
+		e = self.proj_heads[k](z)
+		# L2 normalize keeps only “shape/direction” -> so patients with similar outcomes cluster together even if their raw feature scales differ
+		return F.normalize(e, p=2, dim=1)
