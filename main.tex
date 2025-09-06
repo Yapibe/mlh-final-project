@@ -1,0 +1,276 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage{cite}
+\usepackage{url}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{subcaption}
+
+\title{Multi-Task GRU Autoencoder with Contrastive Learning for ICU Outcome Prediction}
+\author{Machine Learning for Healthcare Final Project\\
+Course 0368-4273}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+
+Critical care medicine requires rapid and accurate risk assessment to optimize patient outcomes and resource allocation. Early identification of patients at high risk for adverse outcomes enables clinicians to implement targeted interventions, adjust treatment intensity, and coordinate appropriate care transitions. This project addresses the fundamental challenge of predicting multiple critical clinical outcomes in the intensive care unit (ICU) setting using data collected during the early hospitalization period.
+
+We develop a novel \textbf{Multi-Task GRU Autoencoder with Contrastive Learning} approach to predict three key clinical outcomes: in-hospital mortality, prolonged length of stay, and 30-day hospital readmission. Our approach advances beyond traditional single-task prediction models by leveraging shared patient representations and multi-modal clinical data to achieve superior performance across all three prediction targets.
+
+\subsection{Clinical Motivation}
+
+Early risk stratification in the ICU is crucial for optimal patient care:
+
+\begin{itemize}
+    \item \textbf{Mortality prediction} enables identification of high-risk patients who may benefit from intensive monitoring, aggressive interventions, or timely palliative care discussions
+    \item \textbf{Prolonged stay prediction} (length of stay $>$ 7 days) facilitates proactive resource planning, discharge coordination, and family communication
+    \item \textbf{Readmission prediction} supports targeted post-discharge interventions to reduce healthcare costs, prevent complications, and improve patient outcomes
+\end{itemize}
+
+These outcomes are interconnected and often share underlying clinical risk factors, making multi-task learning particularly well-suited for this domain.
+
+\subsection{Technical Innovation}
+
+Our approach introduces several key innovations over existing ICU prediction models:
+
+\begin{enumerate}
+    \item \textbf{Multi-Task Architecture}: A shared GRU encoder learns unified patient representations from temporal clinical data, with task-specific classification heads for each outcome
+    
+    \item \textbf{Contrastive Learning}: SupCon loss with adaptive anchoring ensures that patients with similar clinical outcomes cluster together in the learned latent space, improving representation quality
+    
+    \item \textbf{Self-Supervised Learning}: An autoencoder reconstruction objective provides robust feature learning from unlabeled temporal patterns
+    
+    \item \textbf{Advanced Class Balancing}: Smart batch sampling and positives-only contrastive anchoring specifically address the severe class imbalance inherent in clinical prediction tasks
+    
+    \item \textbf{Multi-Modal Integration}: Comprehensive feature extraction from four clinical data modalities with domain-specific processing and temporal aggregation
+\end{enumerate}
+
+\subsection{Architectural Overview}
+
+Our \textbf{Multi-Task Sequence GRU Autoencoder} (\texttt{MultiTaskSeqGRUAE}) implements a three-loss training system:
+
+\begin{align}
+\mathcal{L}_{\text{total}} &= \lambda_{\text{recon}} \mathcal{L}_{\text{reconstruction}} + \lambda_{\text{BCE}} \mathcal{L}_{\text{classification}} + \lambda_{\text{SupCon}} \mathcal{L}_{\text{contrastive}}
+\end{align}
+
+where:
+\begin{itemize}
+    \item $\mathcal{L}_{\text{reconstruction}}$: Masked MSE loss for temporal sequence reconstruction
+    \item $\mathcal{L}_{\text{classification}}$: Weighted BCE loss for multi-task outcome prediction
+    \item $\mathcal{L}_{\text{contrastive}}$: SupCon loss with adaptive anchoring for representation learning
+\end{itemize}
+
+\subsection{Data Source and Prediction Framework}
+
+We utilize the Medical Information Mart for Intensive Care III (MIMIC-III) database, a comprehensive, freely-available dataset containing de-identified health records of over 40,000 patients from critical care units at Beth Israel Deaconess Medical Center (2001-2012). Our analysis focuses on a predefined patient subsample with specific inclusion criteria designed for robust predictive modeling.
+
+The prediction framework implements a structured temporal approach:
+
+\begin{itemize}
+    \item \textbf{Prediction time}: 48 hours after admission ($t = 48h$)
+    \item \textbf{Feature window}: Data collected during first 48 hours, aggregated into 6-hour time bins
+    \item \textbf{Prediction gap}: 6-hour buffer to prevent data leakage and ensure clinical applicability
+    \item \textbf{Minimum stay}: 54 hours required (48h feature window + 6h gap)
+    \item \textbf{Target definitions}:
+    \begin{itemize}
+        \item \textbf{Mortality}: Death during hospitalization or within 30 days of discharge
+        \item \textbf{Prolonged stay}: Length of stay exceeding 7 days (168 hours)
+        \item \textbf{Readmission}: Hospital readmission within 30 days of discharge
+    \end{itemize}
+\end{itemize}
+
+\subsection{Implementation and Evaluation}
+
+The project is implemented in Python using modern deep learning frameworks (PyTorch) and clinical data processing libraries. We utilize DuckDB for efficient data access and manipulation, replacing the traditional BigQuery approach for improved accessibility and reproducibility.
+
+Our evaluation framework encompasses:
+\begin{itemize}
+    \item \textbf{Classification Performance}: ROC curves, precision-recall curves, and threshold-independent metrics
+    \item \textbf{Calibration Analysis}: Reliability diagrams and calibration error assessment for clinical interpretability
+    \item \textbf{Feature Importance}: SHAP analysis for explainable AI and clinical insight generation
+    \item \textbf{Deployment Readiness}: Unseen data evaluation pipeline for real-world applicability
+\end{itemize}
+
+\section{Data and Cohort Description}
+
+\subsection{Dataset Overview}
+
+Our analysis utilizes the MIMIC-III (Medical Information Mart for Intensive Care III) database, a large, publicly available dataset containing comprehensive electronic health records from the critical care units of Beth Israel Deaconess Medical Center. MIMIC-III represents one of the most valuable resources for clinical machine learning research, providing detailed, de-identified patient data spanning over a decade of critical care.
+
+\textbf{Database Characteristics:}
+\begin{itemize}
+    \item \textbf{Patient Population}: Over 40,000 unique patients with 53,423 distinct hospital admissions
+    \item \textbf{Temporal Coverage}: June 2001 to October 2012 (11+ years)
+    \item \textbf{Clinical Settings}: Multiple ICU types including medical, surgical, cardiac, and trauma intensive care units
+    \item \textbf{Data Modalities}: Demographics, vital signs, laboratory results, medications, procedures, clinical notes, and administrative data
+\end{itemize}
+
+\subsection{Cohort Selection and Inclusion Criteria}
+
+To ensure robust predictive modeling and clinical relevance, we implemented strict inclusion criteria for patient selection:
+
+\begin{enumerate}
+    \item \textbf{First Hospital Admissions Only}: Focus on first hospital admissions to avoid bias from readmission patterns and ensure consistent baseline risk assessment
+    
+    \item \textbf{Minimum Hospitalization Duration}: Patients must have $\geq$ 54 hours of hospitalization data (48-hour feature window + 6-hour prediction gap) to enable meaningful temporal modeling
+    
+    \item \textbf{ICU Chart Events Availability}: Presence of chartevents data to ensure comprehensive vital signs and clinical monitoring information
+    
+    \item \textbf{Complete Temporal Coverage}: Sufficient data coverage during the critical first 48 hours of admission for reliable feature extraction
+\end{enumerate}
+
+\textbf{[Note: Insert actual cohort statistics from EDA results here]}
+
+% TODO: Replace with actual EDA results
+\textbf{Final Cohort Characteristics:}
+\begin{itemize}
+    \item \textbf{Total Patients}: [N patients from EDA]
+    \item \textbf{Mean Age}: [Age mean ± std from EDA]
+    \item \textbf{Gender Distribution}: [Male/Female percentages from EDA]
+    \item \textbf{Ethnicity Distribution}: [Top ethnic groups from EDA]
+    \item \textbf{Average Length of Stay}: [Mean LOS from EDA]
+\end{itemize}
+
+\subsection{Target Variable Definitions and Prevalence}
+
+Our multi-task learning approach predicts three clinically significant outcomes with specific temporal definitions aligned with healthcare quality metrics:
+
+\subsubsection{Mortality (Target 1)}
+\textbf{Definition}: Death during initial hospitalization OR within 30 days of discharge
+\\
+\textbf{Clinical Rationale}: Captures both in-hospital mortality and early post-discharge deaths, providing a comprehensive mortality risk assessment that extends beyond the immediate hospitalization period
+\\
+\textbf{Implementation}: Binary indicator based on death timestamps relative to admission and discharge dates
+\\
+\textbf{Prevalence}: [X\% (N/total) from EDA results]
+
+\subsubsection{Prolonged Length of Stay (Target 2)}
+\textbf{Definition}: Total hospitalization duration exceeding 7 days (168 hours)
+\\
+\textbf{Clinical Rationale}: Identifies patients requiring extended resource utilization, enabling proactive care coordination and discharge planning
+\\
+\textbf{Implementation}: Binary indicator based on discharge time minus admission time
+\\
+\textbf{Prevalence}: [X\% (N/total) from EDA results]
+
+\subsubsection{30-Day Hospital Readmission (Target 3)}
+\textbf{Definition}: Hospital readmission within 30 days of initial discharge
+\\
+\textbf{Clinical Rationale}: Identifies patients at risk for care transitions failures, supporting targeted post-discharge interventions
+\\
+\textbf{Implementation}: Binary indicator based on subsequent admission timestamps relative to initial discharge
+\\
+\textbf{Prevalence}: [X\% (N/total) from EDA results]
+
+\subsection{Multi-Modal Clinical Feature Extraction}
+
+Our comprehensive feature extraction process captures clinical complexity through four distinct data modalities, each with domain-specific processing and temporal aggregation:
+
+\subsubsection{Vital Signs (Modality 1)}
+\textbf{Data Source}: CHARTEVENTS table with structured vital sign measurements
+\\
+\textbf{Features Extracted}: Heart rate, systolic/diastolic/mean blood pressure, respiratory rate, temperature (Celsius), oxygen saturation (SpO2), glucose
+\\
+\textbf{Temporal Processing}: 6-hour time bins with statistical aggregation (mean, maximum, minimum, standard deviation)
+\\
+\textbf{Advanced Features}: Temporal gradients ($v_t - v_{t-1}$) to capture dynamic clinical changes
+\\
+\textbf{Quality Control}: Physiologically plausible range filtering using clinical metadata
+\\
+\textbf{Feature Count}: [N vital sign features from EDA]
+
+\subsubsection{Laboratory Results (Modality 2)}
+\textbf{Data Source}: LABEVENTS table with comprehensive laboratory test results
+\\
+\textbf{Features Extracted}: Complete metabolic panel (sodium, potassium, chloride, CO2, BUN, creatinine, glucose), complete blood count (hemoglobin, hematocrit, WBC, platelets), liver function tests, arterial blood gas parameters
+\\
+\textbf{Temporal Processing}: 6-hour aggregation with forward-fill imputation for missing values
+\\
+\textbf{Advanced Features}: Laboratory differentials ($v_t - v_0$) representing change from baseline
+\\
+\textbf{Quality Control}: Laboratory-specific reference range validation
+\\
+\textbf{Feature Count}: [N laboratory features from EDA]
+
+\subsubsection{Medications (Modality 3)}
+\textbf{Data Source}: PRESCRIPTIONS table with detailed medication administration records
+\\
+\textbf{Features Extracted}: Drug categories including antibiotics, sedatives, opioids, steroids, vasopressors, glucose correction agents, insulin, anticoagulants, diuretics
+\\
+\textbf{Processing Pipeline}: 
+\begin{itemize}
+    \item Regex-based drug name normalization and categorization
+    \item Binary usage flags per 6-hour window
+    \item Dose normalization (mg for most categories, units for insulin)
+    \item Cumulative dose tracking across hospitalization
+    \item Novel drug introduction markers
+\end{itemize}
+\textbf{Advanced Features}: Polypharmacy indicators, drug interaction patterns, dose escalation trends
+\\
+\textbf{Feature Count}: [N medication features from EDA]
+
+\subsubsection{Microbiology (Modality 4)}
+\textbf{Data Source}: MICROBIOLOGYEVENTS table with culture results and antimicrobial susceptibility data
+\\
+\textbf{Features Extracted}: Culture site classification (blood, urine, respiratory, wound), organism identification, antimicrobial sensitivity patterns (resistant/sensitive/intermediate)
+\\
+\textbf{Processing Pipeline}:
+\begin{itemize}
+    \item Specimen type standardization using regex patterns
+    \item Binary indicators for common pathogenic organisms
+    \item Resistance pattern encoding
+    \item Positive culture flags
+\end{itemize}
+\textbf{Clinical Significance}: Enables early sepsis detection and antimicrobial resistance assessment
+\\
+\textbf{Feature Count}: [N microbiology features from EDA]
+
+\subsection{Data Quality and Completeness Assessment}
+
+% TODO: Insert actual data quality metrics from EDA
+\textbf{Feature Completeness by Modality:}
+\begin{itemize}
+    \item \textbf{Vital Signs}: [X\% patients with complete vital signs data]
+    \item \textbf{Laboratory Results}: [X\% patients with laboratory data]  
+    \item \textbf{Medications}: [X\% patients with medication data]
+    \item \textbf{Microbiology}: [X\% patients with microbiology data]
+\end{itemize}
+
+\textbf{Missing Data Strategy:}
+\begin{itemize}
+    \item \textbf{Vital Signs/Labs}: Forward-fill imputation within patient timelines
+    \item \textbf{Medications}: Zero-fill for unused drug categories (clinical absence)
+    \item \textbf{Microbiology}: Zero-fill for negative/unreported results
+    \item \textbf{Baseline Imputation}: Patient-specific first-day values for laboratory parameters
+\end{itemize}
+
+\textbf{Final Dataset Characteristics:}
+\begin{itemize}
+    \item \textbf{Total Observations}: [N temporal observations from EDA]
+    \item \textbf{Total Features}: [N total features from EDA]
+    \item \textbf{Temporal Resolution}: 8 time bins × 6 hours = 48-hour coverage
+    \item \textbf{Average Temporal Coverage}: [X time periods per patient from EDA]
+    \item \textbf{Overall Data Completeness}: [X\% from EDA]
+\end{itemize}
+
+\section{Methods}
+% TODO: Add methods section with model architecture details
+
+\section{Results}
+% TODO: Add results section with performance metrics and analysis
+
+\section{Discussion}
+% TODO: Add discussion section with clinical implications and limitations
+
+\section{References}
+% TODO: Add relevant references for clinical prediction, multi-task learning, and MIMIC-III studies
+
+\end{document}
