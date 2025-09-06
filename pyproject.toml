@@ -18,10 +18,12 @@ dependencies = [
     "seaborn>=0.13.2",
     "numpy>=2.0.2",
     "matplotlib-venn>=1.1.2",
+    "duckdb",
+    "torch",
 ]
 
 [tool.setuptools]
-packages = ["project"]
+packages = ["preprocessing", "model"]
 
 [tool.setuptools.exclude-package-data]
 "*" = ["MLH*"] 
