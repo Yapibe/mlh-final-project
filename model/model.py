@@ -1,12 +1,13 @@
 import numpy as np
 import torch
 import torch.nn as nn
-from torch.nn.utils.rnn import pack_padded_sequence
+import torch.nn.functional as F
+from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
 
 # ---------- Model ----------
 class MultiTaskSeqGRUAE(nn.Module):
-	def __init__(self, input_dim, enc_hidden=128, enc_layers=1, dec_hidden=128, dec_layers=1, latent_dim=64, SupCon_latent_dim=32,dropout=0.1):
+	def __init__(self, input_dim, enc_hidden=128, enc_layers=1, dec_hidden=128, dec_layers=1, latent_dim=64, SupCon_latent_dim=32, pooling="final", dropout=0.1):
 		""" input_dim : number of features per timestep (D)
 		   enc_hidden: hidden size of the encoder GRU
 		   dec_hidden: hidden size of the decoder GRU
@@ -16,11 +17,15 @@ class MultiTaskSeqGRUAE(nn.Module):
 		"""
 		super().__init__()
 		
+		# e.g., "final", "mean+final", "mean+max+final", "mean+attn"
+		self.pooling = pooling  
+		self.modes = [m.strip().lower() for m in self.pooling.split('+')]
+		
 		# encoder: GRU reads X's timeline step-by-step and compresses it into latent space
 		self.encoder = nn.GRU(input_dim, enc_hidden, enc_layers, batch_first=True, dropout=dropout if enc_layers > 1 else 0.0, bidirectional=False)
 
 		# turn the encoder’s hidden vector into latent size
-		self.to_latent = nn.Linear(enc_hidden, latent_dim)
+		self.to_latent = nn.Linear(len(self.modes) * enc_hidden, latent_dim)
 
 		# projection head for contrastive learning - 2-layer MLP for each task 
 		self.proj_heads = nn.ModuleList([
@@ -42,12 +47,54 @@ class MultiTaskSeqGRUAE(nn.Module):
 		# reconstruct original features from GRU hidden state 
 		self.out = nn.Linear(dec_hidden, input_dim)
 
+	# def encode(self, x, lengths):
+	# 	packed = pack_padded_sequence(x, lengths.cpu(), batch_first=True, enforce_sorted=False)
+	# 	_, hN = self.encoder(packed) # the final hidden states for each layer(num_layers, B, H)
+	# 	# last layer’s final hidden state - summary of each patient’s whole sequence
+	# 	h_last = hN[-1] # (B, H)
+	# 	z = self.to_latent(h_last) # (B, Z)
+	# 	return z
+
 	def encode(self, x, lengths):
+		# x: (B,T,D), lengths: (B,)
 		packed = pack_padded_sequence(x, lengths.cpu(), batch_first=True, enforce_sorted=False)
-		_, hN = self.encoder(packed) # the final hidden states for each layer(num_layers, B, H)
-		# last layer’s final hidden state - summary of each patient’s whole sequence
-		h_last = hN[-1] # (B, H)
-		z = self.to_latent(h_last) # (B, Z)
+		out_packed, hN = self.encoder(packed)              # hN: (layers,B,H)
+		out, _ = pad_packed_sequence(out_packed, batch_first=True)  # out: GRU outputs for all time steps, (B,T,H)
+		B, T, H = out.shape
+		device = out.device
+
+		# build (B,T,1) valid mask from lengths
+		t_idx = torch.arange(T, device=device).unsqueeze(0).expand(B, T) # (B,T)
+		t_valid = (t_idx < lengths.unsqueeze(1)).float().unsqueeze(-1) # mask for valid time steps, (B,T,1)
+
+		vecs = []
+		for mode in self.modes:
+			# GRU’s memory after the last real time step - "summary"
+			if mode == "final":
+				vecs.append(hN[-1]) # (B,H) final hidden state
+			# average of the GRU’s outputs across all valid time steps per-patient
+			elif mode == "mean":
+				summed = (out * t_valid).sum(dim=1) # (B,H), zeroes out padded steps so they don’t affect the average and sum
+				denom  = t_valid.sum(dim=1).clamp_min(1.0) # (B,1), how many real steps each patient has
+				vecs.append(summed / denom) # (B,H)
+			# maximum activation across time for each feature per-patient
+			elif mode == "max":
+				# t_valid should be (B, T, 1). Make it boolean and DON'T squeeze.
+				mask_pad = (t_valid == 0) if t_valid.dtype != torch.bool else ~t_valid
+				# Broadcasts (B,T,1) -> (B,T,H)
+				masked = out.masked_fill(mask_pad, float("-inf"))
+				vecs.append(masked.max(dim=1).values)   # (B, H)
+			# the model learn which time steps are important and weight them more
+			elif mode == "attn":
+				scores = self.attn(out) # linear layer per time step -> converts each seq vector into a single "importance score", (B,T,1)
+				scores = scores.masked_fill(t_valid == 0, float("-inf")) # so padding steps wont get attention
+				alpha  = torch.softmax(scores, dim=1) # scores -> probability distribution across all valid time steps, (B,T,1)
+				vecs.append((alpha * out).sum(dim=1)) # attention-pooled vector for each patient, (B,H)
+			else:
+				raise ValueError(f"Unknown pooling mode: {mode}")
+
+		z_pre = torch.cat(vecs, dim=1) # (B, concat_mult*H)
+		z = self.to_latent(z_pre) # (B, latent_dim)
 		return z
 
 	def decode(self, z, T):

@@ -124,7 +124,7 @@ def predict_proba_knn(model, X_train, X_test, mask_train, mask_test, y_train, n_
 	
 	for k in range(3):
 		# cosine on unit sphere; Euclidean works too when normalized
-		knn = NearestNeighbors(n_neighbors=n_neig, metric="euclidean")
+		knn = NearestNeighbors(n_neighbors=n_neig, metric="cosine")
 		knn.fit(Ztr[k])
 		
 		# For each test point find its nearest train points
