@@ -7,7 +7,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from dataset import TimeSeriesDataset
 
-from sklearn.metrics import roc_auc_score, average_precision_score, brier_score_loss, roc_curve, precision_recall_curve, confusion_matrix, precision_recall_fscore_support, ConfusionMatrixDisplay
+from sklearn.metrics import roc_auc_score, average_precision_score, accuracy_score, f1_score, roc_curve, precision_recall_curve, confusion_matrix, precision_recall_fscore_support, precision_score, ConfusionMatrixDisplay
 
 from sklearn.neighbors import NearestNeighbors
 
@@ -29,12 +29,11 @@ def predict_proba(model, X, mask, device=None):
 			probs_all.append(probs.cpu())
 		return torch.cat(probs_all, dim=0).numpy()
 
-def eval_multitask_from_probs(y_true, probs, plot=True, tr=0.5):
+def eval_multitask_from_probs(y_true, probs, plot=True, tr=0.5, task_names = ["prolonged_stay", "mortality", "readmission"]):
 	"""
 	y_true, probs: shape (N, 3) — per-patient labels and predicted probabilities.
 	Returns dict of metrics per task. If plot=True, draws ROC, PR, and confusion matrix.
 	"""
-	task_names = ["mortality", "prolonged_stay", "readmission"]
 	report = {}
 
 	for t, name in enumerate(task_names):
@@ -104,28 +103,36 @@ def encode_embeddings(model, X, mask, device=None, batch_size=128):
 		# dummy y just to satisfy the Dataset signature
 		ds = TimeSeriesDataset(X, np.zeros((X.shape[0], 3), dtype=np.float32), mask)
 		loader = DataLoader(ds, batch_size=batch_size, shuffle=False)
-
-		embs = []
+		
+		embs = [[],[],[]]
 		for xb, _, _, lb in loader:
 			xb, lb = xb.to(device), lb.to(device)
 			z, _, _ = model(xb, lb) # (B, Z)
-			e = model.proj(z) # (B, Zp) -> the SupCon space
-			e = F.normalize(e, p=2, dim=1)  # unit-length rows
-			embs.append(e.cpu())
+			for i in range(3):
+				e = model.project(z,i) # (B, Zp) -> the SupCon space
+				embs[i].append(e.cpu())
+		
+		full_embs = [torch.cat(embs[i], dim=0).numpy() for i in range(3)]
+		return full_embs
 
-		return torch.cat(embs, dim=0).numpy()
-
-def predict_proba_knn(model, X_train, X_test, mask_train, mask_test, n_neig=10, device=None):
+def predict_proba_knn(model, X_train, X_test, mask_train, mask_test, y_train, n_neig=10, device=None):
 	""" return per-patient probabilities for the 3 tasks using KNN in the embeddings """
+	probs = []
 	# find embeddings (fit index)
 	Ztr = encode_embeddings(model, X_train, mask_train)
 	Zte = encode_embeddings(model, X_test,  mask_test)
-
-	# cosine on unit sphere; Euclidean works too when normalized
-	knn = NearestNeighbors(n_neighbors=n_neig, metric="euclidean")
-	knn.fit(Ztr)
 	
-	# For each test point find its nearest train points
-	dist, idx = knn.kneighbors(Zte, n_neighbors=n_neig)
-	# simple unweighted vote → mean label among neighbors per task
-	return y_train[idx].mean(axis=1)   # shape (N_test, 3)
+	for k in range(3):
+		# cosine on unit sphere; Euclidean works too when normalized
+		knn = NearestNeighbors(n_neighbors=n_neig, metric="cosine")
+		knn.fit(Ztr[k])
+		
+		# For each test point find its nearest train points
+		dist, idx = knn.kneighbors(Zte[k], n_neighbors=n_neig)
+		
+		# distance-weighted voting (smaller dist => larger weight)
+		w = 1.0 / (dist + 1e-6)
+		w = w / w.sum(axis=1, keepdims=True)
+		pt = (y_train[idx, k] * w).sum(axis=1)  # weighted mean
+		probs.append(pt)
+	return np.vstack(probs).T   # shape (N_test, 3)

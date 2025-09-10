@@ -34,9 +34,6 @@ class SupConLoss(nn.Module):
 		""" z : (B, D) embeddings that will be L2-normalized 
 		    y : (B,)   labels in {0,1} for this ONE task """
 		
-		# L2 normalize keeps only “shape/direction” -> so patients with similar outcomes cluster together even if their raw feature scales differ
-		z = F.normalize(z, p=2, dim=1)
-		
 		B = z.size(0)
 		# cosine similarity matrix
 		sim = z @ z.t() / self.temp
