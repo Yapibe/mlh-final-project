@@ -47,14 +47,6 @@ class MultiTaskSeqGRUAE(nn.Module):
 		# reconstruct original features from GRU hidden state 
 		self.out = nn.Linear(dec_hidden, input_dim)
 
-	# def encode(self, x, lengths):
-	# 	packed = pack_padded_sequence(x, lengths.cpu(), batch_first=True, enforce_sorted=False)
-	# 	_, hN = self.encoder(packed) # the final hidden states for each layer(num_layers, B, H)
-	# 	# last layer’s final hidden state - summary of each patient’s whole sequence
-	# 	h_last = hN[-1] # (B, H)
-	# 	z = self.to_latent(h_last) # (B, Z)
-	# 	return z
-
 	def encode(self, x, lengths):
 		# x: (B,T,D), lengths: (B,)
 		packed = pack_padded_sequence(x, lengths.cpu(), batch_first=True, enforce_sorted=False)
@@ -84,12 +76,6 @@ class MultiTaskSeqGRUAE(nn.Module):
 				# Broadcasts (B,T,1) -> (B,T,H)
 				masked = out.masked_fill(mask_pad, float("-inf"))
 				vecs.append(masked.max(dim=1).values)   # (B, H)
-			# the model learn which time steps are important and weight them more
-			elif mode == "attn":
-				scores = self.attn(out) # linear layer per time step -> converts each seq vector into a single "importance score", (B,T,1)
-				scores = scores.masked_fill(t_valid == 0, float("-inf")) # so padding steps wont get attention
-				alpha  = torch.softmax(scores, dim=1) # scores -> probability distribution across all valid time steps, (B,T,1)
-				vecs.append((alpha * out).sum(dim=1)) # attention-pooled vector for each patient, (B,H)
 			else:
 				raise ValueError(f"Unknown pooling mode: {mode}")
 

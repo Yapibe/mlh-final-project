@@ -37,10 +37,14 @@ def train_multitask_seq_ae(
 		lambda_recon=1.0,
 		lambda_bce=1.0,
 		lambda_supcon=0.5,
-		pos_weights=[1,1,1],
+		pos_weights_bce=[1,1,1],
+		pos_weights_supcon=[1,1,1],
 		pooling_mode = "final",
 		device="cuda" if torch.cuda.is_available() else "cpu",
-		temperature=0.2):
+		temperature=0.2,
+		supcon_gamma=0.7,   # CB exponent (0.5–0.8 is gentle)
+		supcon_delta=0.5,   # inverse-anchors exponent (0.3–0.7)
+		seed=0):
 	""" this function trains the multi-task GRU autoencoder with three losses at once:
 	 * Reconstruction (masked MSE)
 	 * Classification for 3 tasks (BCE)
@@ -49,11 +53,12 @@ def train_multitask_seq_ae(
 	
 	# data setup
 	ds = TimeSeriesDataset(X, y, mask)
-	set_seed(42)
-	sampler = BalancedPositivesPerTaskSampler(y, batch_size=batch_size, p_per_task=p_per_task, seed=42)
+	set_seed(seed)
+	sampler = BalancedPositivesPerTaskSampler(y, batch_size=batch_size, p_per_task=p_per_task, seed=seed)
 	loader = DataLoader(ds, batch_sampler=sampler)
 	
-	pos_weights = torch.as_tensor(pos_weights, dtype=torch.float32, device=device)
+	pos_weights_bce = torch.as_tensor(pos_weights_bce, dtype=torch.float32, device=device)
+	pos_weights_supcon = torch.as_tensor(pos_weights_supcon, dtype=torch.float32, device=device)
 	
 	# def model and loss objects
 	model = MultiTaskSeqGRUAE(input_dim=input_dim, latent_dim=latent_dim, SupCon_latent_dim=SupCon_latent_dim, pooling=pooling_mode).to(device)
@@ -67,7 +72,7 @@ def train_multitask_seq_ae(
 	])
 
 	# numerically stable BCE (Binary Cross-Entropy) with per-task class weights to balance rare posives
-	bce_losses = [nn.BCEWithLogitsLoss(pos_weight=pos_weights[k]) for k in range(3)]
+	bce_losses = [nn.BCEWithLogitsLoss(pos_weight=pos_weights_bce[k]) for k in range(3)]
 	
 	running_total = {"recon": [], "bce": [], "supcon": [], "total": []}
 	for ep in range(1, epochs + 1): # epoch loop
@@ -78,6 +83,10 @@ def train_multitask_seq_ae(
 		warmup_phase = (ep <= warmup_epochs)
 		cur_lambda_recon, cur_lambda_bce, cur_lambda_supcon = ((1.0, 0.0, 0.0) if warmup_phase else (lambda_recon, lambda_bce, lambda_supcon))
 
+		# SupCon per task, positives-only anchors for the rare targets mort and read
+		sup_rare = SupConLoss(temperature=temperature, anchor_mode="positives")  # rare
+		sup_5050 = SupConLoss(temperature=temperature, anchor_mode="both")       # ~50/50
+	
 		for xb, yb, mb, lb in loader: # batch loop 
 			# xb = inputs (B,T,D), yb = labels (B,3), mb = mask (B,T), lb = lengths (B,)
 			xb, yb, mb, lb = xb.to(device), yb.to(device), mb.to(device), lb.to(device)
@@ -94,27 +103,29 @@ def train_multitask_seq_ae(
 			for k in range(3):
 				loss_bce += bce_losses[k](logits[k].view(-1), yb[:,k])
 			loss_bce = loss_bce * (cur_lambda_bce / 3.0)
-
-			# SupCon per task, positives-only anchors for the rare targets mort and read
-			sup_rare = SupConLoss(temperature=temperature, anchor_mode="positives")  # rare
-			sup_5050 = SupConLoss(temperature=temperature, anchor_mode="both")       # ~50/50
-			
-			# gentle class-imbalance weights from pos_weights
-			task_w = (pos_weights / pos_weights.mean()).pow(0.5).detach()
 			
 			# automaticaly append prolonged_stay (~50/50)
 			sup_terms = [sup_5050(model.project(z, 0), yb[:, 0])]
-			sup_weights = [task_w[0]]
+			task_ids = [0]
 			# for each of the rare cases append only if there are anchors (pos samples) in the batch 
 			for i in [1,2]:
 				if (yb[:, i].sum() >= 2):
 					sup_terms.append(sup_rare(model.project(z, i), yb[:, i]))
-					sup_weights.append(task_w[i])
-			
-			w = torch.stack(sup_weights)
-			w = w / w.sum() # normalize so total weight = 1
-			loss_sup = cur_lambda_supcon * torch.stack(sup_terms).mul(w).sum()
-			
+					task_ids.append(i)
+
+			# gentle class-imbalance weights from pos_weights
+			cb = pos_weights_supcon[task_ids].clamp_min(1e-12).pow(supcon_gamma)
+
+			# Dynamic per-batch inverse anchors — soften via delta
+			invP = torch.tensor(
+				[1.0 / max(int((yb[:, t] == 1).sum().item()), 1) for t in task_ids],
+				device=z.device, dtype=torch.float32).clamp_min(1e-12).pow(supcon_delta)
+
+			# Combine and normalize
+			W = (cb * invP)
+			W = W / (W.sum() + 1e-12)
+			loss_sup = cur_lambda_supcon * torch.stack(sup_terms).mul(W).sum()
+
 			# combine total loss and backprop
 			loss = loss_recon + loss_bce + loss_sup
 			loss.backward()
