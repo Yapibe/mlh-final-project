@@ -40,11 +40,11 @@ def split_data(X, y, groups_df):
 
 	# Test / Val (50%/50% of the temp → 10% each of total)
 	gss_test_val = GroupShuffleSplit(n_splits=1, test_size=0.5)
-	test_idx, val_idx = next(gss_test_val.split(X_temp, y_temp, groups=groups_df.iloc[temp_idx]))
+	val_idx, test_idx = next(gss_test_val.split(X_temp, y_temp, groups=groups_df.iloc[temp_idx]))
 	X_test,  y_test  = X_temp.iloc[test_idx], y_temp.iloc[test_idx]
 	X_val,   y_val   = X_temp.iloc[val_idx], y_temp.iloc[val_idx]
 	
-	return X_train, y_train, X_test, y_test, X_val, y_val
+	return X_train, y_train, X_val, y_val, X_test, y_test
 
 def data_norm(df, numeric_cols, scaler=None):
 	""" Standardize numeric features 
