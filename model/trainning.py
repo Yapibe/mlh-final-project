@@ -4,9 +4,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader, Sampler
 
-from dataset import TimeSeriesDataset, BalancedPositivesPerTaskSampler
-from model import MultiTaskSeqGRUAE
-from loss import masked_mse, SupConLoss
+from model.dataset import TimeSeriesDataset, BalancedPositivesPerTaskSampler
+from model.model import MultiTaskSeqGRUAE
+from model.loss import masked_mse, SupConLoss
 
 import os, random
 
@@ -37,8 +37,8 @@ def train_multitask_seq_ae(
 		lambda_recon=1.0,
 		lambda_bce=1.0,
 		lambda_supcon=0.5,
-		pos_weights_bce=[1,1,1],
-		pos_weights_supcon=[1,1,1],
+		weights_bce=[1,1,1],
+		weights_supcon=[1,1,1],
 		pooling_mode = "final",
 		device="cuda" if torch.cuda.is_available() else "cpu",
 		temperature=0.2,
@@ -57,8 +57,8 @@ def train_multitask_seq_ae(
 	sampler = BalancedPositivesPerTaskSampler(y, batch_size=batch_size, p_per_task=p_per_task, seed=seed)
 	loader = DataLoader(ds, batch_sampler=sampler)
 	
-	pos_weights_bce = torch.as_tensor(pos_weights_bce, dtype=torch.float32, device=device)
-	pos_weights_supcon = torch.as_tensor(pos_weights_supcon, dtype=torch.float32, device=device)
+	weights_bce = torch.as_tensor(weights_bce, dtype=torch.float32, device=device)
+	weights_supcon = torch.as_tensor(weights_supcon, dtype=torch.float32, device=device)
 	
 	# def model and loss objects
 	model = MultiTaskSeqGRUAE(input_dim=input_dim, latent_dim=latent_dim, SupCon_latent_dim=SupCon_latent_dim, pooling=pooling_mode).to(device)
@@ -72,7 +72,7 @@ def train_multitask_seq_ae(
 	])
 
 	# numerically stable BCE (Binary Cross-Entropy) with per-task class weights to balance rare posives
-	bce_losses = [nn.BCEWithLogitsLoss(pos_weight=pos_weights_bce[k]) for k in range(3)]
+	bce_losses = [nn.BCEWithLogitsLoss(pos_weight=weights_bce[k]) for k in range(3)]
 	
 	running_total = {"recon": [], "bce": [], "supcon": [], "total": []}
 	for ep in range(1, epochs + 1): # epoch loop
@@ -114,7 +114,7 @@ def train_multitask_seq_ae(
 					task_ids.append(i)
 
 			# gentle class-imbalance weights from pos_weights
-			cb = pos_weights_supcon[task_ids].clamp_min(1e-12).pow(supcon_gamma)
+			cb = weights_supcon[task_ids].clamp_min(1e-12).pow(supcon_gamma)
 
 			# Dynamic per-batch inverse anchors — soften via delta
 			invP = torch.tensor(
