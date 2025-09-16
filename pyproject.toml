@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mlhc-project"
+version = "0.1.0"
+description = "Bioinformatics research project for MLHC"
+requires-python = ">=3.9"
+dependencies = [
+    "pandas",
+    "google-cloud-bigquery",
+    "scikit-learn",
+    "google-auth",
+    "ipykernel>=6.29.5",
+    "db-dtypes>=1.4.3",
+    "matplotlib>=3.9.4",
+    "seaborn>=0.13.2",
+    "numpy>=2.0.2",
+    "matplotlib-venn>=1.1.2",
+    "duckdb",
+    "torch",
+]
+
+[tool.setuptools]
+packages = ["preprocessing", "model"]
+
+[tool.setuptools.exclude-package-data]
+"*" = ["MLH*"] 
