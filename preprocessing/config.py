@@ -24,5 +24,7 @@ targets_config = {
 	"readmission_d": 30, # hospital readmission 
 }
 
+TASKS = ['mortality','prolonged_stay','readmission']
+
 def get_config():
-	return {"data_paths" : paths, "temporal_config" : temporal_config, "targets_config" : targets_config}
+	return {"data_paths" : paths, "temporal_config" : temporal_config, "targets_config" : targets_config, "TASKS" : TASKS}

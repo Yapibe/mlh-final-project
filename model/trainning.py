@@ -30,6 +30,7 @@ def train_multitask_seq_ae(
 		p_per_task=4,
 		epochs=20,
 		warmup_epochs=3,
+		warmup_scales=(0.0, 0.0, 1.0),
 		latent_dim=64, 
 		max_lr=1e-3,
 		min_lr=1e-4,
@@ -81,7 +82,7 @@ def train_multitask_seq_ae(
 		n_batches = 0
 
 		warmup_phase = (ep <= warmup_epochs)
-		cur_lambda_recon, cur_lambda_bce, cur_lambda_supcon = ((1.0, 0.0, 0.0) if warmup_phase else (lambda_recon, lambda_bce, lambda_supcon))
+		cur_lambda_recon, cur_lambda_bce, cur_lambda_supcon = (warmup_scales if warmup_phase else (lambda_recon, lambda_bce, lambda_supcon))
 
 		# SupCon per task, positives-only anchors for the rare targets mort and read
 		sup_rare = SupConLoss(temperature=temperature, anchor_mode="positives")  # rare
