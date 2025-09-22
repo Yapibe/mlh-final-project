@@ -1,524 +1,498 @@
-\documentclass[11pt]{article}
-\usepackage[margin=1in]{geometry}
-\usepackage{amsmath}
-\usepackage{amsfonts}
-\usepackage{amssymb}
-\usepackage{graphicx}
-\usepackage{cite}
-\usepackage{url}
-\usepackage{booktabs}
-\usepackage{multirow}
-\usepackage{subcaption}
+%%%%%%%% ICML 2025 EXAMPLE LATEX SUBMISSION FILE %%%%%%%%%%%%%%%%%
 
-\title{Multi-Task GRU Autoencoder with Contrastive Learning for ICU Outcome Prediction}
-\author{Yair Pickholz, Lital Valichman\\
-Machine Learning for Healthcare Final Project\\
-Course 0368-4273}
-\date{\today}
+\documentclass{article}
+
+% Recommended, but optional, packages for figures and better typesetting:
+\usepackage{microtype}
+\usepackage{graphicx}
+\usepackage{subfigure}
+\usepackage{booktabs} % for professional tables
+
+% hyperref makes hyperlinks in the resulting PDF.
+% If your build breaks (sometimes temporarily if a hyperlink spans a page)
+% please comment out the following usepackage line and replace
+% \usepackage{icml2025} with \usepackage[nohyperref]{icml2025} above.
+\usepackage{hyperref}
+
+
+% Attempt to make hyperref and algorithmic work together better:
+\newcommand{\theHalgorithm}{\arabic{algorithm}}
+
+% Use the following line for the initial blind version submitted for review:
+% \usepackage{icml2025}
+
+% If accepted, instead use the following line for the camera-ready submission:
+\usepackage[accepted]{icml2025}
+
+% For theorems and such
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{mathtools}
+\usepackage{amsthm}
+
+% if you use cleveref..
+\usepackage[capitalize,noabbrev]{cleveref}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% THEOREMS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\theoremstyle{plain}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{assumption}[theorem]{Assumption}
+\theoremstyle{remark}
+\newtheorem{remark}[theorem]{Remark}
+
+% Todonotes is useful during development; simply uncomment the next line
+%    and comment out the line below the next line to turn off comments
+%\usepackage[disable,textsize=tiny]{todonotes}
+\usepackage[textsize=tiny]{todonotes}
+
+
+% The \icmltitle you define below is probably too long as a header.
+% Therefore, a short form for the running title is supplied here:
+\icmltitlerunning{Submission and Formatting Instructions for ICML 2025}
 
 \begin{document}
 
-\maketitle
+\twocolumn[
+\icmltitle{TRIAGE: Time-series Risk Prediction from ICU Data via a GRU Autoencoder with Contrastive Embeddings}
+
+% It is OKAY to include author information, even for blind
+% submissions: the style file will automatically remove it for you
+% unless you've provided the [accepted] option to the icml2025
+% package.
+
+% List of affiliations: The first argument should be a (short)
+% identifier you will use later to specify author affiliations
+% Academic affiliations should list Department, University, City, Region, Country
+% Industry affiliations should list Company, City, Region, Country
+
+% You can specify symbols, otherwise they are numbered in order.
+% Ideally, you should not use this facility. Affiliations will be numbered
+% in order of appearance and this is the preferred way.
+\icmlsetsymbol{equal}{*}
+
+\begin{icmlauthorlist}
+\icmlauthor{Lital Voulichman}{sch}
+\icmlauthor{Yair Pickholz Berliner
+}{sch}
+%\icmlauthor{}{sch}
+%\icmlauthor{}{sch}
+\end{icmlauthorlist}
+
+\icmlkeywords{Machine Learning, Healthcare ML, ICU, Time-series, Contrastive Learning}
+
+\vskip 0.3in
+]
+
+% \begin{abstract}
+% Accurate early prediction of Intensive Care Unit (ICU) outcomes is essential for guiding interventions and allocating critical resources. Prior studies have shown that risk stratification within the first days of hospitalization enables clinicians to intervene proactively and improve trajectories \cite{deasy2020dynamic}. Deep learning models trained on electronic health record (EHR) time-series have demonstrated reasonable accuracy for predicting mortality, prolonged stay, and readmission \cite{shukla2020integrating}\cite{ruan2025evidence}, yet many approaches struggle to jointly model multiple outcomes, capture temporal dynamics, and provide interpretable risk estimates.
+
+% We present TRIAGE, a multi-task sequence model that predicts three ICU outcomes: (i) in-hospital or 30-day mortality, (ii) prolonged stay (over 7 days), and (iii) 30-day readmission - using only the first 48 hours of admission data with a 6-hour prediction gap. TRIAGE integrates a GRU-based sequence autoencoder with supervised contrastive embeddings, creating a shared patient embedding space that both improves discriminative performance and can enable comparison of patient trajectories for interpretability. 
+
+% Using multimodal features from MIMIC-III (demographics, vitals, labs, microbiology, and prescriptions), TRIAGE outperforms the GRU baselines. These results demonstrate that embedding-based, calibrated multi-task learning can enhance both performance and clarity in early ICU risk prediction.
+
+% \end{abstract}
+
+\begin{abstract}
+Accurate early prediction of Intensive Care Unit (ICU) outcomes is critical for timely interventions and resource allocation. Existing deep learning models show promise but often fail to jointly model multiple outcomes while remaining interpretable.
+
+We introduce TRIAGE, a multi-task model that predicts three ICU outcomes from the first 48 hours of admission: mortality, prolonged stay, and readmission. TRIAGE combines a GRU-based sequence autoencoder with contrastive learning to generate shared patient embeddings, improving discrimination and enabling interpretable patient similarity comparisons.
+
+Using multimodal ICU data, TRIAGE achieves strong performance across tasks, with notable gains for rare outcomes. These results show that embedding-based multi-task learning can enhance both accuracy and interpretability in early ICU risk prediction.
+\end{abstract}
 
 \section{Introduction}
 
-Critical care medicine requires rapid and accurate risk assessment to optimize patient outcomes and resource allocation. Early identification of patients at high risk for adverse outcomes enables clinicians to implement targeted interventions, adjust treatment intensity, and coordinate appropriate care transitions. This project addresses the fundamental challenge of predicting multiple critical clinical outcomes in the intensive care unit (ICU) setting using data collected during the early hospitalization period.
+Early and accurate risk prediction in the ICU is crucial for improving patient outcomes and prioritizing limited resources \cite{deasy2020dynamic}. Deep learning models, especially those based on RNN and GRU architectures, have advanced outcome prediction from EHR time-series data, outperforming traditional methods on tasks like mortality, prolonged stay, and readmission \cite{shukla2020integrating, ruan2025evidence, deng2022explainable}. Despite these gains, existing models are often limited to single tasks, leverage only part of multimodal ICU datasets, and lack interpretable outputs clinicians can trust \cite{deng2022explainable, zang2021scehr}.
 
-We develop a \textbf{Multi-Task GRU Autoencoder with Contrastive Learning} approach to predict three key clinical outcomes: in-hospital mortality, prolonged length of stay, and 30-day hospital readmission. Our approach extends traditional single-task prediction models by leveraging shared patient representations and multi-modal clinical data across all three prediction targets.
+Recent methods introduce multi-task learning and supervised contrastive objectives, allowing models to simultaneously predict multiple outcomes and organize patient representations for better discrimination and explainability \cite{zang2021scehr, ma2024global}. However, few approaches combine these advances with robust calibration and comprehensive multimodal input.
 
-\subsection{Clinical Motivation}
-
-Early risk stratification in the ICU is crucial for optimal patient care:
-
-\begin{itemize}
-    \item \textbf{Mortality prediction} enables identification of high-risk patients who may benefit from intensive monitoring, aggressive interventions, or timely palliative care discussions
-    \item \textbf{Prolonged stay prediction} (length of stay $>$ 7 days) facilitates proactive resource planning, discharge coordination, and family communication
-    \item \textbf{Readmission prediction} supports targeted post-discharge interventions to reduce healthcare costs, prevent complications, and improve patient outcomes
-\end{itemize}
-
-These outcomes are interconnected and often share underlying clinical risk factors, making multi-task learning particularly well-suited for this domain.
-
-\subsection{Technical Innovation}
-
-Our approach incorporates several techniques for ICU outcome prediction:
-
-\begin{enumerate}
-    \item \textbf{Multi-Task Architecture}: A shared GRU encoder learns patient representations from temporal clinical data, with task-specific classification heads for each outcome
-    
-    \item \textbf{Contrastive Learning}: SupCon loss with adaptive anchoring to cluster patients with similar clinical outcomes in the learned latent space
-    
-    \item \textbf{Self-Supervised Learning}: An autoencoder reconstruction objective for learning from temporal patterns
-    
-    \item \textbf{Class Balancing}: Batch sampling and contrastive anchoring methods to address class imbalance in clinical prediction tasks
-    
-    \item \textbf{Multi-Modal Integration}: Feature extraction from four clinical data modalities with temporal aggregation
-\end{enumerate}
-
-\subsection{Architectural Overview}
-
-The \textbf{Multi-Task Sequence GRU Autoencoder} uses a three-loss training system:
-
-\begin{align}
-\mathcal{L}_{\text{total}} &= \lambda_{\text{recon}} \mathcal{L}_{\text{reconstruction}} + \lambda_{\text{BCE}} \mathcal{L}_{\text{classification}} + \lambda_{\text{SupCon}} \mathcal{L}_{\text{contrastive}}
-\end{align}
-
-where:
-\begin{itemize}
-    \item $\mathcal{L}_{\text{reconstruction}}$: Masked MSE loss for temporal sequence reconstruction
-    \item $\mathcal{L}_{\text{classification}}$: Weighted BCE loss for multi-task outcome prediction
-    \item $\mathcal{L}_{\text{contrastive}}$: SupCon loss with adaptive anchoring for representation learning
-\end{itemize}
-
-\subsection{Data Source and Prediction Framework}
-
-We utilize the Medical Information Mart for Intensive Care III (MIMIC-III) database, a comprehensive, freely-available dataset containing de-identified health records of over 40,000 patients from critical care units at Beth Israel Deaconess Medical Center (2001-2012). Our analysis focuses on a predefined patient subsample with specific inclusion criteria designed for robust predictive modeling.
-
-The prediction framework implements a structured temporal approach:
-
-\begin{itemize}
-    \item \textbf{Prediction time}: 48 hours after admission ($t = 48h$)
-    \item \textbf{Feature window}: Data collected during first 48 hours, aggregated into 6-hour time bins
-    \item \textbf{Prediction gap}: 6-hour buffer to prevent data leakage and ensure clinical applicability
-    \item \textbf{Minimum stay}: 54 hours required (48h feature window + 6h gap)
-    \item \textbf{Target definitions}:
-    \begin{itemize}
-        \item \textbf{Mortality}: Death during hospitalization or within 30 days of discharge
-        \item \textbf{Prolonged stay}: Length of stay exceeding 7 days (168 hours)
-        \item \textbf{Readmission}: Hospital readmission within 30 days of discharge
-    \end{itemize}
-\end{itemize}
-
-\subsection{Implementation and Evaluation}
-
-The project uses deep learning frameworks for model implementation and clinical data processing.
-
-Our evaluation framework encompasses:
-\begin{itemize}
-    \item \textbf{Classification Performance}: ROC curves, precision-recall curves, and threshold-independent metrics
-    \item \textbf{Calibration Analysis}: Reliability diagrams and calibration error assessment for clinical interpretability
-    \item \textbf{Feature Importance}: SHAP analysis for explainable AI and clinical insight generation
-    \item \textbf{Deployment Readiness}: Unseen data evaluation pipeline for real-world applicability
-\end{itemize}
-
-\section{Data and Cohort Description}
-
-\subsection{Dataset Overview}
-
-Our analysis utilizes the MIMIC-III (Medical Information Mart for Intensive Care III) database, a large, publicly available dataset containing comprehensive electronic health records from the critical care units of Beth Israel Deaconess Medical Center. MIMIC-III represents one of the most valuable resources for clinical machine learning research, providing detailed, de-identified patient data spanning over a decade of critical care.
-
-\textbf{Database Characteristics:}
-\begin{itemize}
-    \item \textbf{Patient Population}: Over 40,000 unique patients with 53,423 distinct hospital admissions
-    \item \textbf{Temporal Coverage}: June 2001 to October 2012 (11+ years)
-    \item \textbf{Clinical Settings}: Multiple ICU types including medical, surgical, cardiac, and trauma intensive care units
-    \item \textbf{Data Modalities}: Demographics, vital signs, laboratory results, medications, procedures, clinical notes, and administrative data
-\end{itemize}
-
-\subsection{Cohort Selection and Inclusion Criteria}
-
-To ensure robust predictive modeling and clinical relevance, we implemented strict inclusion criteria for patient selection:
-
-\begin{enumerate}
-    \item \textbf{First Hospital Admissions Only}: Focus on first hospital admissions to avoid bias from readmission patterns and ensure consistent baseline risk assessment
-    
-    \item \textbf{Minimum Hospitalization Duration}: Patients must have at least 54 hours of hospitalization data (48-hour feature window + 6-hour prediction gap) to enable meaningful temporal modeling
-    
-    \item \textbf{ICU Chart Events Availability}: Presence of chartevents data to ensure comprehensive vital signs and clinical monitoring information
-    
-    \item \textbf{Complete Temporal Coverage}: Sufficient data coverage during the critical first 48 hours of admission for reliable feature extraction
-\end{enumerate}
-
-\textbf{Final Cohort Characteristics:}
-\begin{itemize}
-    \item \textbf{Total Patients}: 27,636 unique patients
-    \item \textbf{Total Observations}: 190,963 temporal observations (6.9 avg time periods per patient)
-    \item \textbf{Mean Age}: 66.3 years (median: 63.0 years, range: 0.0-310.0 years)
-    \item \textbf{Gender Distribution}: Male 56.8\% (108,442), Female 43.2\% (82,521)
-    \item \textbf{Total Features}: 274 comprehensive clinical features across 4 modalities
-    \item \textbf{Temporal Coverage}: 48-hour window aggregated into 6-hour time bins
-\end{itemize}
-
-\subsection{Target Variable Definitions and Prevalence}
-
-Our multi-task learning approach predicts three clinically significant outcomes with specific temporal definitions aligned with healthcare quality metrics:
-
-\subsubsection{Mortality (Target 1)}
-\textbf{Definition}: Death during initial hospitalization OR within 30 days of discharge
-\\
-\textbf{Clinical Rationale}: Captures both in-hospital mortality and early post-discharge deaths, providing a comprehensive mortality risk assessment that extends beyond the immediate hospitalization period
-\\
-\textbf{Implementation}: Binary indicator based on death timestamps relative to admission and discharge dates
-\\
-\textbf{Prevalence}: 11.7\% (22,289 cases out of 190,963 observations)
-
-\subsubsection{Prolonged Length of Stay (Target 2)}
-\textbf{Definition}: Total hospitalization duration exceeding 7 days (168 hours)
-\\
-\textbf{Clinical Rationale}: Identifies patients requiring extended resource utilization, enabling proactive care coordination and discharge planning
-\\
-\textbf{Implementation}: Binary indicator based on discharge time minus admission time
-\\
-\textbf{Prevalence}: 50.2\% (95,800 cases out of 190,963 observations)
-
-\subsubsection{30-Day Hospital Readmission (Target 3)}
-\textbf{Definition}: Hospital readmission within 30 days of initial discharge
-\\
-\textbf{Clinical Rationale}: Identifies patients at risk for care transitions failures, supporting targeted post-discharge interventions
-\\
-\textbf{Implementation}: Binary indicator based on subsequent admission timestamps relative to initial discharge
-\\
-\textbf{Prevalence}: 3.9\% (7,503 cases out of 190,963 observations)
-
-\subsection{Multi-Modal Clinical Feature Extraction}
-
-Our comprehensive feature extraction process captures clinical complexity through four distinct data modalities, each with domain-specific processing and temporal aggregation:
-
-\subsubsection{Vital Signs (Modality 1)}
-\textbf{Data Source}: CHARTEVENTS table with structured vital sign measurements
-\\
-\textbf{Features Extracted}: Heart rate, systolic/diastolic/mean blood pressure, respiratory rate, temperature (Celsius), oxygen saturation (SpO2), glucose
-\\
-\textbf{Temporal Processing}: 6-hour time bins with statistical aggregation (mean, maximum, minimum, standard deviation)
-\\
-\textbf{Advanced Features}: Temporal gradients ($v_t - v_{t-1}$) to capture dynamic clinical changes
-\\
-\textbf{Quality Control}: Physiologically plausible range filtering using clinical metadata
-\\
-\textbf{Feature Count}: 36 vital sign features
-\\
-\textbf{Key Statistics}: Heart rate (mean: 92.6 ± 25.1 bpm), Systolic BP (mean: 121.0 ± 19.0 mmHg), Temperature (mean: 36.9 ± 0.8°C)
-
-\subsubsection{Laboratory Results (Modality 2)}
-\textbf{Data Source}: LABEVENTS table with comprehensive laboratory test results
-\\
-\textbf{Features Extracted}: Complete metabolic panel (sodium, potassium, chloride, CO2, BUN, creatinine, glucose), complete blood count (hemoglobin, hematocrit, WBC, platelets), liver function tests, arterial blood gas parameters
-\\
-\textbf{Temporal Processing}: 6-hour aggregation with forward-fill imputation for missing values
-\\
-\textbf{Advanced Features}: Laboratory differentials ($v_t - v_0$) representing change from baseline
-\\
-\textbf{Quality Control}: Laboratory-specific reference range validation
-\\
-\textbf{Feature Count}: 33 laboratory features
-\\
-\textbf{Completeness Rates}: Hemoglobin (88.4\%), WBC (86.4\%), Potassium (83.3\%), Sodium (83.0\%), Glucose (79.8\%)
-
-\subsubsection{Medications (Modality 3)}
-\textbf{Data Source}: PRESCRIPTIONS table with detailed medication administration records
-\\
-\textbf{Features Extracted}: Drug categories including antibiotics, sedatives, opioids, steroids, vasopressors, glucose correction agents, insulin, anticoagulants, diuretics
-\\
-\textbf{Processing Pipeline}: 
-\begin{itemize}
-    \item Regex-based drug name normalization and categorization
-    \item Binary usage flags per 6-hour window
-    \item Dose normalization (mg for most categories, units for insulin)
-    \item Cumulative dose tracking across hospitalization
-    \item Novel drug introduction markers
-\end{itemize}
-\textbf{Advanced Features}: Polypharmacy indicators, drug interaction patterns, dose escalation trends
-\\
-\textbf{Feature Count}: 77 medication categories
-\\
-\textbf{Top Usage Rates}: Antibiotics (12.8\%), Anticoagulants (11.6\%), Analgesics (10.3\%), Insulin (10.3\%), Sedatives (9.5\%)
-
-\subsubsection{Microbiology (Modality 4)}
-\textbf{Data Source}: MICROBIOLOGYEVENTS table with culture results and antimicrobial susceptibility data
-\\
-\textbf{Features Extracted}: Culture site classification (blood, urine, respiratory, wound), organism identification, antimicrobial sensitivity patterns (resistant/sensitive/intermediate)
-\\
-\textbf{Processing Pipeline}:
-\begin{itemize}
-    \item Specimen type standardization using regex patterns
-    \item Binary indicators for common pathogenic organisms
-    \item Resistance pattern encoding
-    \item Positive culture flags
-\end{itemize}
-\textbf{Clinical Significance}: Enables early sepsis detection and antimicrobial resistance assessment
-\\
-\textbf{Feature Count}: 33 microbiology features
-\\
-\textbf{Notable Patterns}: Blood cultures (62.9\% of observations), comprehensive antibiotic resistance profiling, common pathogen detection
-
-\subsection{Data Quality and Completeness Assessment}
-
-\textbf{Feature Completeness by Modality:}
-\begin{itemize}
-    \item \textbf{Vital Signs}: 61.0-72.0\% completeness (Heart rate: 72.0\%, Blood pressure: 62.1\%, Temperature: 61.0\%)
-    \item \textbf{Laboratory Results}: 78.2-88.4\% completeness for core labs (Hemoglobin: 88.4\%, Creatinine: 78.2\%)  
-    \item \textbf{Medications}: Variable usage reflecting clinical need (ACE inhibitors: 2.9\%, Antibiotics: 12.8\%)
-    \item \textbf{Microbiology}: 62.9\% patients with blood culture data, comprehensive resistance profiling available
-\end{itemize}
-
-\textbf{Missing Data Strategy:}
-\begin{itemize}
-    \item \textbf{Vital Signs/Labs}: Forward-fill imputation within patient timelines
-    \item \textbf{Medications}: Zero-fill for unused drug categories (clinical absence)
-    \item \textbf{Microbiology}: Zero-fill for negative/unreported results
-    \item \textbf{Baseline Imputation}: Patient-specific first-day values for laboratory parameters
-\end{itemize}
-
-\textbf{Final Dataset Characteristics:}
-\begin{itemize}
-    \item \textbf{Total Observations}: 190,963 temporal observations
-    \item \textbf{Total Features}: 274 comprehensive clinical features
-    \item \textbf{Temporal Resolution}: Up to 8 time bins × 6 hours = 48-hour coverage
-    \item \textbf{Average Temporal Coverage}: 6.9 time periods per patient
-    \item \textbf{Overall Data Completeness}: 72.5\% (appropriate for clinical data)
-    \item \textbf{Target Correlations}: Mortality-Prolonged stay (r=0.063), Prolonged stay-Readmission (r=0.050), Mortality-Readmission (r=-0.003)
-\end{itemize}
-
-\subsection{Class Imbalance and Modeling Challenges}
-
-Our dataset exhibits significant class imbalance characteristic of clinical prediction tasks, which directly motivates our advanced multi-task learning approach with contrastive learning:
-
-\textbf{Class Distribution Analysis:}
-\begin{itemize}
-    \item \textbf{Severe Imbalance}: Readmission (3.9\% positive) and Mortality (11.7\% positive) represent severe minority classes
-    \item \textbf{Balanced Target}: Prolonged stay (50.2\% positive) provides a more balanced learning signal
-    \item \textbf{Low Inter-target Correlation}: Weak correlations (r < 0.07) suggest complementary prediction signals
-\end{itemize}
-
-\textbf{Technical Implications:}
-\begin{itemize}
-    \item \textbf{Smart Sampling}: BalancedPositivesPerTaskSampler ensures at least 4 positive examples per task per batch
-    \item \textbf{Adaptive Anchoring}: "Positives-only" contrastive anchoring for rare events (mortality, readmission)
-    \item \textbf{Weighted Loss Functions}: Task-specific class weights derived from prevalence rates
-    \item \textbf{Shared Representations}: Multi-task learning leverages balanced prolonged stay signal to improve rare event prediction
-\end{itemize}
+We present TRIAGE, a GRU-based multi-task autoencoder with supervised contrastive learning, designed to jointly predict mortality, prolonged stay, and readmission using all available ICU data from the first 48 hours. TRIAGE yields accurate, calibrated risk predictions and interpretable patient embeddings, enabling case-based reasoning and surpassing standard baselines on MIMIC-III.
 
 \section{Methods}
+\subsection{Dataset Characteristics}
 
-\subsection{Inclusion and Exclusion Criteria}
+Our cohort was constructed from provided subject IDs, comprising 27,636 unique patients from MIMIC-III with 190,963 observations over 48-hour windows. The population had a median age of 65.6 years with 56.6\% male patients. Target prevalences were: 11.7\% mortality, 50.2\% prolonged stay, and 3.9\% readmission, reflecting substantial class imbalance that motivated our specialized sampling and loss weighting strategies.
 
-Patient selection followed strict criteria to ensure data quality and clinical relevance:
+The feature set included 274 variables across four modalities with varying completeness: vital signs (36 features, 62-72\%), laboratories (33 features, 78-88\%), medications (77 features, high completeness), and microbiology (33 features, selective based on clinical suspicion).
 
-\textbf{Inclusion Criteria:}
+\subsection{Data Pre-processing}
+
+Following project guidelines, only the first hospital admission for each patient was used, with admissions shorter than 54 hours excluded to ensure a full 48-hour observation period plus a 6-hour prediction gap.
+
+For laboratory and vital signs, we filtered measurements against metadata-defined physiological ranges (provided in HW materials) to remove implausible values. Time stamps were aligned to non-overlapping 6-hour bins, providing a balance between temporal resolution and data sparsity: shorter bins would increase missingness and noise, while longer bins obscure clinically relevant fluctuations.
+
+Missing data were imputed by forward-filling within each admission; any remaining missingness was filled with patient-specific baseline values (first-day measurements). Continuous features were standardized via z-score normalization, fitted on the training set only to avoid data leakage.
+
+Finally, all features were padded into fixed-length sequences ($N$ patients $\times$ $T{=}8$ time steps $\times$ $D$ features), with binary masks tracking valid windows. Labels for the three prediction tasks were aligned at the patient level. The resulting dataset was split into training, validation, and test subsets (80/10/10) using grouped patient-level splits to prevent data leakage across admissions.
+
+\subsection{Feature Engineering}
+
+We represented each patient as a multivariate time series over the first 48 hours of admission. Beyond demographics, laboratory tests, and vital signs, we included prescriptions and microbiology as additional modalities. These were chosen because medication patterns reflect treatment intensity and clinical judgment, while microbiology captures suspected sources of infection and their severity.
+
+\textbf{Demographics}: Gender was encoded as binary, and ethnicity was collapsed into five categories (White, Black, Hispanic, Asian, Other) with one-hot encoding.
+
+\textbf{Lab and Vital Dynamics}: To capture patient instability, we engineered lab difference-from-baseline features (each value compared to the patient's first recorded measurement) and vital sign first-order differences between consecutive 6-hour windows. Key vitals included heart rate (72\% completeness), blood pressure measures (62\%), and respiratory parameters.
+
+\textbf{Prescriptions}: Drug names were mapped into curated clinical categories using keyword dictionaries. Common categories included antibiotics (12.8\% usage rate), anticoagulants (11.6\%), sedatives (9.5\%), and insulin (10.3\%). For each 6-hour window, we derived binary indicators for drug administration, distinct drug counts, and normalized doses for high-impact categories.
+
+\textbf{Microbiology}: Specimen sources were grouped into anatomical categories, with blood cultures representing 62.9\% of microbiology events. We added indicators for culture positivity, antibiotic susceptibility, and common organisms, providing signals about infection source and severity.
+
+\subsection{Model}
+
+Firstly, training uses a \textbf{balanced positive-per-task sampler}, which guarantees sufficient positive cases per batch while keeping the remainder representative of the overall population.
+
+Then, inspired by the paper we presented in class, we implemented a \textbf{multitask sequence autoencoder with supervised contrastive learning} (Fig.~\ref{fig:model}). 
+
+The backbone is a GRU autoencoder trained with three complementary objectives: 
+
 \begin{itemize}
-    \item First hospital admission only (to avoid readmission bias)
-    \item At least 54 hours of hospitalization (48h feature window + 6h prediction gap)
-    \item Presence of ICU chartevents data for vital sign monitoring
-    \item Complete temporal coverage during the first 48 hours of admission
+    \item \textbf{Reconstruction:} Forces the encoder to retain broad patient-level information about the time series, ensuring the latent representation remains informative.  
+    \item \textbf{Outcome classification:} Task-specific linear heads predict mortality, prolonged stay, and readmission. Class imbalance is addressed with weighted binary cross-entropy.  
+    \item \textbf{Supervised Contrastive learning:} Projection heads encourage patients with the same outcome label to cluster in latent space, while rare positive cases are emphasized through positive-only anchors and weighting.  
 \end{itemize}
 
-\textbf{Exclusion Criteria:}
-\begin{itemize}
-    \item Patients with insufficient temporal data coverage
-    \item Missing critical baseline information (age, gender)
-    \item Hospitalizations shorter than minimum required duration
-    \item Subsequent admissions for the same patient
-\end{itemize}
+These objectives are combined into a weighted total loss. A short \textbf{warm-up phase} trains the encoder with reconstruction and contrastive objectives before introducing classification, stabilizing the latent space. 
 
-\textbf{Final Cohort:} 27,636 patients meeting all inclusion criteria from the initial MIMIC-III population.
+Latent embeddings are pooled by concatenating the GRU’s final hidden state, mean, and max across time, capturing both long-term trends and acute peaks.  
 
-\subsection{Data Preprocessing Pipeline}
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=1.0\linewidth]{model_sketch.png}
+    \caption{Architecture of the multi-task GRU autoencoder with supervised contrastive learning. 
+    The GRU encoder compresses the multivariate time series into a latent representation $z$, which is 
+    used for (i) sequence reconstruction by the decoder, (ii) outcome prediction via classification heads, 
+    and (iii) representation learning through contrastive projection heads. Losses are combined with 
+    task-specific weights, and training includes a warm-up phase to stabilize the latent space.}
+    \label{fig:model}
+\end{figure}
 
-\subsubsection{Temporal Aggregation}
-Clinical data was processed using a structured temporal framework:
-\begin{itemize}
-    \item \textbf{Time Binning}: 48-hour observation period divided into 6-hour bins (8 total bins)
-    \item \textbf{Statistical Aggregation}: For each feature and time bin, computed mean, maximum, minimum, and standard deviation
-    \item \textbf{Sequence Padding}: Variable-length patient timelines padded to maximum sequence length with masking
-\end{itemize}
+Finally, predicted logits are converted into \textbf{calibrated probabilities}, using Platt scaling or isotonic regression on the validation set, to produce reliable risk estimates suitable for clinical decision support.
+\subsection{Evaluation Modes}
 
-\subsubsection{Feature Engineering}
-Advanced temporal features were derived from base measurements:
-\begin{itemize}
-    \item \textbf{Laboratory Differentials}: Change from baseline ($v_t - v_0$) for all laboratory parameters
-    \item \textbf{Vital Sign Gradients}: Temporal derivatives ($v_t - v_{t-1}$) to capture dynamic changes
-    \item \textbf{Medication Patterns}: Binary usage flags, dose tracking, and novel drug introduction markers
-    \item \textbf{Microbiology Encoding}: Culture site classification, organism identification, and resistance patterns
-\end{itemize}
-
-\subsubsection{Missing Data Handling}
-A multi-strategy approach addressed clinical data missingness:
-\begin{itemize}
-    \item \textbf{Forward Fill}: Within-patient imputation for vital signs and laboratory values
-    \item \textbf{Baseline Imputation}: Patient-specific first-day values for laboratory parameters
-    \item \textbf{Zero Fill}: Medications and microbiology (absence = not administered/negative)
-    \item \textbf{Physiological Constraints}: Range validation using clinical metadata
-\end{itemize}
-
-\subsubsection{Data Partitioning}
-Patient-level splitting prevented data leakage:
-\begin{itemize}
-    \item \textbf{Training Set}: 60\% of patients for model training
-    \item \textbf{Validation Set}: 20\% of patients for hyperparameter tuning
-    \item \textbf{Test Set}: 20\% of patients for final evaluation
-\end{itemize}
-
-\subsection{Model Architecture}
-
-\subsubsection{Multi-Task GRU Autoencoder}
-The core architecture consists of three main components:
-
-\textbf{Encoder (GRU-based):}
-\begin{itemize}
-    \item Bidirectional GRU processes temporal sequences of clinical features
-    \item Hidden dimension: 128 units, single layer with dropout (0.1)
-    \item Maps variable-length sequences to fixed-size latent representations ($z \in \mathbb{R}^{64}$)
-\end{itemize}
-
-\textbf{Decoder (Reconstruction):}
-\begin{itemize}
-    \item GRU decoder reconstructs original temporal sequences from latent representations
-    \item Hidden dimension: 128 units, trained with masked MSE loss
-    \item Provides self-supervised learning signal for robust feature learning
-\end{itemize}
-
-\textbf{Multi-Task Heads:}
-\begin{itemize}
-    \item Three separate linear classifiers ($\mathbb{R}^{64} \rightarrow \mathbb{R}^1$) for each outcome
-    \item Shared latent representation $z$ fed to all task-specific heads
-    \item Binary classification with sigmoid activation
-\end{itemize}
-
-\subsubsection{Contrastive Learning Component}
-A projection head enables contrastive learning:
-\begin{itemize}
-    \item Two-layer MLP: $64 \rightarrow 32 \rightarrow 32$ with ReLU activation
-    \item L2 normalization of projected embeddings
-    \item SupCon loss with adaptive anchoring strategy
-\end{itemize}
-
-\subsubsection{Training Objective}
-The total loss combines three components:
-
-\begin{align}
-\mathcal{L}_{\text{total}} &= \lambda_{\text{recon}} \mathcal{L}_{\text{MSE}} + \lambda_{\text{BCE}} \mathcal{L}_{\text{classification}} + \lambda_{\text{SupCon}} \mathcal{L}_{\text{contrastive}}
-\end{align}
-
-where:
-\begin{itemize}
-    \item $\mathcal{L}_{\text{MSE}}$: Masked mean squared error for sequence reconstruction
-    \item $\mathcal{L}_{\text{classification}}$: Weighted binary cross-entropy for each task
-    \item $\mathcal{L}_{\text{contrastive}}$: Supervised contrastive loss with temperature scaling ($\tau = 0.2$)
-\end{itemize}
-
-\subsubsection{Class Imbalance Handling}
-Multiple strategies addressed severe class imbalance:
-
-\textbf{Balanced Sampling:}
-\begin{itemize}
-    \item Custom batch sampler ensuring at least 4 positive examples per task per batch
-    \item Oversampling with replacement for rare positive cases
-    \item Batch size: 64 patients
-\end{itemize}
-
-\textbf{Adaptive Contrastive Anchoring:}
-\begin{itemize}
-    \item "Positives-only" anchoring for rare targets (mortality, readmission)
-    \item Standard "both" anchoring for balanced target (prolonged stay)
-    \item Task-specific weighting based on prevalence rates
-\end{itemize}
-
-\textbf{Loss Weighting:}
-\begin{itemize}
-    \item Class weights inversely proportional to target prevalence
-    \item Task-specific BCE loss weighting: mortality (8.5), readmission (25.6), prolonged stay (1.0)
-\end{itemize}
+We evaluated the model in two complementary ways:  
+(1) directly through the task-specific BCE heads, which serves as our main evaluation and consistently achieved higher accuracy; and  
+(2) by applying $k$-nearest neighbors (KNN) classification in the learned contrastive embedding space. While the latter yields lower predictive performance, it provides additional interpretability by allowing a patient’s risk to be assessed in relation to clinically similar neighbors in the embedding space.
 
 \section{Results}
 
-\subsection{Model Performance}
+The model was trained on the training set, tuned and calibrated on the validation set, and 
+evaluated exclusively on the held-out test set. In this section we report results based on the 
+\textbf{BCE head predictions}, which serve as our primary evaluation mode. 
+Performance was estimated using bootstrapping on the test cohort, and we report the mean and standard deviation 
+of AUROC and AUPR in Fig.~\ref{fig:evaluation}. 
 
-The Multi-Task GRU Autoencoder with Contrastive Learning was trained for 20 epochs using the training parameters specified in Section \ref{methods}. The model demonstrated strong predictive performance across all three clinical outcomes, with particular improvements observed when using proper temporal masking compared to baseline approaches.
+\begin{figure}[h]
+    \centering
+    {\includegraphics[width=1.02\linewidth]{eval_mortality.png}}\\[0.2cm]
+    {\includegraphics[width=1.05\linewidth]{eval_prolonged_stay.png}}\\[0.2cm]
+    {\includegraphics[width=1.05\linewidth]{eval_readmission.png}}
+    \caption{Evaluation results on the test set for each prediction task. Each panel shows (from left to right) 
+    the ROC curve, the precision–recall curve. Mean and standard deviation across 
+    bootstrap resamples are reported within each plot.}
+    \label{fig:evaluation}
+\end{figure}
 
-\subsubsection{Training Configuration}
+As expected, the rare outcomes of \textbf{mortality} and especially \textbf{readmission} are the most challenging to predict. Nevertheless, the model maintains good discrimination and calibration, even in these imbalanced settings.  
 
-The final model was trained with the following hyperparameters:
-\begin{itemize}
-    \item \textbf{Architecture}: GRU encoder/decoder with 128 hidden units, 64-dimensional latent space
-    \item \textbf{Pooling}: Combined final+mean+max pooling for temporal aggregation
-    \item \textbf{Batch sampling}: 6 positive examples per task per batch (64 total batch size)
-    \item \textbf{Loss weights}: $\lambda_{\text{recon}} = 0.2$, $\lambda_{\text{BCE}} = 1.0$, $\lambda_{\text{SupCon}} = 2.0$
-    \item \textbf{Class weights}: [1, 7, 24] for prolonged stay, mortality, and readmission respectively
-    \item \textbf{Temperature}: $\tau = 0.07$ for contrastive learning
-    \item \textbf{Learning rates}: 1e-3 for most components, 1e-4 for readmission head
-    \item \textbf{Warmup}: 1 epoch reconstruction-only training
-\end{itemize}
+\subsection{Comparison to baselines}
 
-\subsubsection{Predictive Performance Metrics}
+To understand the contribution of each model component, we compared our full model against 
+a plain GRU baseline and ablated versions without reconstruction loss, without supervised contrastive loss, 
+and with BCE-only training. 
 
-The model achieved strong discriminative performance across all three prediction tasks:
+As shown in the appendix, the model delivers overall consistent improvements over the plain GRU baselines, with the largest gains observed for the rare \textbf{readmission prediction}. 
 
-\begin{table}[h!]
-\centering
-\begin{tabular}{lccc}
-\toprule
-\textbf{Clinical Outcome} & \textbf{ROC-AUC} & \textbf{PR-AUC} & \textbf{Prevalence} \\
-\midrule
-Prolonged Stay (>7 days) & 0.8345 & 0.4032 & 50.2\% \\
-Mortality (in-hospital/30-day) & 0.7799 & 0.7716 & 11.7\% \\
-30-day Readmission & 0.6379 & 0.0827 & 3.9\% \\
-\bottomrule
-\end{tabular}
-\caption{Multi-task model performance on test set (N=2,764 patients). ROC-AUC measures discrimination ability, PR-AUC captures performance in class-imbalanced settings.}
-\label{tab:performance}
-\end{table}
+The results show that each component contributes to final performance: reconstruction improves stability, 
+contrastive learning sharpens embeddings especially for rare tasks, and task-specific BCE heads provide 
+direct predictive power. The detailed comparison tables (mean AUROC and AUPR across tasks) are reported 
+in the Appendix.
 
-\subsubsection{Performance Analysis by Clinical Task}
+\subsection{Feature Importance Evaluation}
+\label{sec:featimp}
 
-\textbf{Prolonged Length of Stay Prediction:}
-\begin{itemize}
-    \item \textbf{ROC-AUC}: 0.8345 demonstrates excellent discrimination between short and long-stay patients
-    \item \textbf{Clinical Impact}: Strong performance enables proactive resource planning and discharge coordination
-    \item \textbf{Balance}: Relatively balanced target (50.2\% prevalence) facilitated robust learning
-\end{itemize}
+We assessed feature importance with SHAP (GradientExplainer) applied to our trained model. 
+For each task, we wrapped the network to output the task’s calibrated probability and computed SHAP values on 
+balanced mini-batches (background from training data, evaluation from test data). We report: 
+(i) global importance (mean $|\text{SHAP}|$ across samples and time), 
+(ii) temporal heatmaps highlighting when features matter over the first 48\,h, and 
+(iii) beeswarm plots aggregating effects over time per feature. 
 
-\textbf{Mortality Prediction:}
-\begin{itemize}
-    \item \textbf{ROC-AUC}: 0.7799 shows good discrimination for high-risk patient identification
-    \item \textbf{PR-AUC}: 0.7716 indicates strong precision-recall performance despite class imbalance (11.7\% prevalence)
-    \item \textbf{Clinical Impact}: Reliable early mortality risk assessment supports clinical decision-making
-\end{itemize}
-
-\textbf{30-day Readmission Prediction:}
-\begin{itemize}
-    \item \textbf{ROC-AUC}: 0.6379 shows moderate discrimination, reflecting the inherent difficulty of readmission prediction
-    \item \textbf{Challenge}: Severe class imbalance (3.9\% prevalence) and multifactorial post-discharge factors
-    \item \textbf{Improvement}: Contrastive learning and multi-task architecture provided meaningful gains over single-task baselines
-\end{itemize}
-
-\subsubsection{Impact of Temporal Masking}
-
-Proper temporal masking significantly improved model performance compared to naive padding approaches:
-
-\begin{table}[h!]
-\centering
-\begin{tabular}{lcccc}
-\toprule
-\textbf{Masking Strategy} & \textbf{Outcome} & \textbf{ROC-AUC} & \textbf{PR-AUC} & \textbf{$\Delta$ ROC-AUC} \\
-\midrule
-\multirow{3}{*}{Dummy Masks (all ones)} & Prolonged Stay & 0.8271 & 0.4214 & -- \\
-& Mortality & 0.7846 & 0.7711 & -- \\
-& Readmission & 0.5715 & 0.0722 & -- \\
-\midrule
-\multirow{3}{*}{Real Masks (proper)} & Prolonged Stay & 0.8345 & 0.4032 & +0.0074 \\
-& Mortality & 0.7799 & 0.7716 & -0.0047 \\
-& Readmission & 0.6379 & 0.0827 & +0.0664 \\
-\bottomrule
-\end{tabular}
-\caption{Performance comparison between dummy masking (treating all timesteps as valid) and proper temporal masking (distinguishing real data from padding).}
-\label{tab:masking_comparison}
-\end{table}
-
-The most significant improvement was observed for readmission prediction (+6.64\% ROC-AUC), demonstrating the importance of proper temporal modeling for complex, rare clinical outcomes.
-
-\subsubsection{Multi-Task Learning Benefits}
-
-The shared representation learning approach provided several advantages:
-\begin{itemize}
-    \item \textbf{Parameter Efficiency}: Single encoder serves all three prediction tasks
-    \item \textbf{Representation Transfer}: Balanced prolonged stay signal improves rare event prediction
-    \item \textbf{Regularization}: Multi-task objective prevents overfitting to individual tasks
-    \item \textbf{Clinical Coherence}: Joint modeling captures interconnected clinical outcomes
-\end{itemize}
 
 \section{Discussion}
-% TODO: Add discussion section with clinical implications and limitations
 
-\section{References}
-% TODO: Add relevant references for clinical prediction, multi-task learning, and MIMIC-III studies
+You should organize your paper into sections and paragraphs to help
+readers place a structure on the material and understand its
+contributions.
+
+\section{Code Availability}
+
+The implementation of data preprocessing, our model, training and evaluation, is available at our GitHub repository:
+bla
+
+\bibliography{reference}
+\bibliographystyle{plain}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% APPENDIX
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\newpage
+\appendix
+\section{Model Details}
+
+\subsection{Architecture}
+
+As explained in section [2.3] The model is a \textbf{multitask sequence autoencoder with supervised contrastive learning}, 
+built on a GRU encoder--decoder backbone. The GRU encoder compresses each patient’s 
+time series into a latent representation $z$, which is then used for reconstruction of the input sequence (decoder), prediction of the three outcomes via task-specific classification heads, and learning discriminative embeddings via contrastive projection heads.
+
+The total objective is the weighted sum of three complementary losses, described below.
+
+\subsection{Loss Functions}
+
+\paragraph{Reconstruction.}  
+To prevent the encoder from collapsing into task-specific shortcuts, we included 
+a reconstruction objective that forces $z$ to retain broad information about the 
+original time series. We used a masked mean squared error (MSE), which ignores padded values:
+\[
+    \mathcal{L}_{\text{recon}} = 
+    \frac{\sum_{i,t} m_{i,t}\,\|x_{i,t} - \hat{x}_{i,t}\|^2}{\sum_{i,t} m_{i,t}} ,
+\]
+where $x_{i,t}$ and $\hat{x}_{i,t}$ are the true and reconstructed values for patient $i$ at timestep $t$, 
+and $m_{i,t}$ is a binary mask indicating valid timesteps.
+
+\paragraph{Outcome classification.}  
+For the three clinical tasks (mortality, prolonged stay, readmission), we used task-specific 
+linear heads trained with weighted binary cross-entropy. the BCE loss ${L}_{\text{BCE}}$ is calculated:
+\[
+    \mathcal - \frac{1}{N}\sum_{i=1}^N \sum_{k=1}^3 w_k
+       \Big[ y_{i,k}\log \sigma(\ell_{i,k}) + (1-y_{i,k})\log(1-\sigma(\ell_{i,k})) \Big]
+\]
+where $\ell_{i,k}$ is the logit for patient $i$ and task $k$, 
+$\sigma(\cdot)$ is the sigmoid function, and $w_k = \tfrac{\#\text{neg}_k}{\#\text{pos}_k}$ 
+is an inverse class frequency weight to up-weight rare positive cases.  
+This prevents the model from being dominated by majority-class negatives.
+
+\paragraph{Supervised Contrastive loss.}  
+Each task includes a projection head mapping $z$ into a task-specific embedding space. 
+Following (**add paper**) patients with the same label are pulled closer, and those with different labels are pushed apart. We calculate the SupCon loss ${L}_{\text{SupCon}}$:
+\[
+    \mathcal 
+    - \frac{1}{|\mathcal{A}|} \sum_{a \in \mathcal{A}}
+    \frac{1}{|\mathcal{P}(a)|} \sum_{p \in \mathcal{P}(a)}
+    \log \frac{\exp(z_a \cdot z_p / \tau)}{\sum_{n \in \mathcal{N}(a)} \exp(z_a \cdot z_n / \tau)} ,
+\]
+where $\mathcal{A}$ are anchors, $\mathcal{P}(a)$ positives for anchor $a$, 
+and $\mathcal{N}(a)$ all others. For rare tasks such as mortality and readmission, 
+we restricted anchors to positive cases (\textit{positive-only anchors}), ensuring 
+that scarce but informative positives shape the embedding space.  
+The SupCon terms were also weighted by class frequencies to balance the influence 
+of rare versus common outcomes.
+
+\paragraph{Total loss.}  
+The three losses were combined into a weighted sum:
+\[
+    \mathcal{L} = \lambda_{\text{recon}} \mathcal{L}_{\text{recon}} + 
+                  \lambda_{\text{BCE}} \mathcal{L}_{\text{BCE}} + 
+                  \lambda_{\text{SupCon}} \mathcal{L}_{\text{SupCon}} .
+\]
+Hyperparameters $\lambda$ control the tradeoff between general representational learning, 
+task-specific prediction, and discriminative structure.
+
+\subsection{Training Strategy}
+
+\paragraph{Warm-up.}  
+We used a short warm-up phase to stabilize training. Initially, only reconstruction and 
+contrastive losses were active 
+($\lambda_{\text{recon}}{=}1,\;\lambda_{\text{SupCon}}{=}1,\;\lambda_{\text{BCE}}{=}0$), 
+allowing the encoder to build a structured latent space.  
+After warm-up, we reduced the reconstruction weight and introduced the BCE loss 
+($\lambda_{\text{BCE}}>0$), enabling the model to specialize for prediction.  
+This staged approach prevented the classification heads from destabilizing the latent 
+space too early.
+
+\paragraph{Pooling.}  
+The latent embedding $z$ was built by concatenating:  
+(i) the GRU’s final hidden state, which summarizes long-term memory,  
+(ii) the mean across time, which captures average trends, and  
+(iii) the max across time, which highlights acute peaks.  
+This combination allowed $z$ to encode both chronic and acute dynamics.
+
+\paragraph{Batch sampling.}  
+We applied a balanced positive-per-task sampler. Each batch explicitly included at least 
+six positive cases per outcome, ensuring stable learning signals for rare outcomes. 
+The remaining slots were filled with random patients, preserving a realistic distribution 
+of the population. This design provided both balance and representativeness.
+
+\paragraph{Calibration.} 
+Finally, task logits were post-processed into \textbf{well-calibrated probabilities}, an essential requirement for clinical decision support. 
+We applied post-hoc calibration on the validation set using \textit{Platt scaling}, which fits a logistic regression model to map raw logits into calibrated probabilities. 
+This substantially improved the alignment between predicted probabilities and observed outcome frequencies. 
+As shown in Fig.~\ref{fig:calibration}, calibration reduced deviations from perfect reliability, particularly at intermediate probability ranges, and consistently lowered both expected calibration error (ECE) and Brier scores. 
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\linewidth]{calibplot_mortality.png}\\[0.2cm]
+    \includegraphics[width=\linewidth]{calibplot_prolonged_stay.png}\\[0.2cm]
+    \includegraphics[width=\linewidth]{calibplot_readmission.png}
+    \caption{Calibration results for the three prediction tasks - mortality, prolonged stay, and readmission (in this order). 
+    Each panel compares predictions 
+    before (blue) and after (orange) Platt scaling, with reliability curves on the left and 
+    probability histograms on the right. Metrics (ECE and Brier score) are reported in each case, confirming improved calibration.}
+    \label{fig:calibration}
+\end{figure}
+
+\subsection{Hyperparameters}
+
+Model hyperparameters, including the supervised contrastive temperature $\tau$, the loss weights 
+($\lambda_{\text{recon}}, \lambda_{\text{BCE}}, \lambda_{\text{SupCon}}$), learning rates, and pooling modes, 
+were tuned to balance reconstruction quality, discriminative embedding structure, and predictive performance. 
+We explored candidate values both through automated search (Optuna with grid and random sampling strategies) 
+and manual refinement. All hyperparameter selection was carried out on the validation set only, 
+ensuring that the held-out test set remained untouched for final evaluation.
+
+\subsection{Summary}
+
+In summary, our model combines three synergistic training objectives to shape a joint latent 
+representation: reconstruction ensures informativeness, classification provides predictive power, 
+and supervised contrastive learning adds discriminative structure. Warm-up training, careful pooling, 
+balanced batch sampling, and calibration further improved stability and clinical utility.  
+Together, these design choices produced a model that is expressive, robust to imbalance, and capable 
+of generating reliable patient-level risk estimates.
+
+\section{Model Evaluation}
+
+\subsection{Ablation Studies and Baseline Comparisons}
+\label{app:ablations}
+
+Table~\ref{tab:ablation_bce} reports AUROC and AUPR for predictions from the BCE heads, 
+and Table~\ref{tab:ablation_knn} reports results using KNN classification in the 
+contrastive embedding space. The results confirm that removing either reconstruction 
+or contrastive learning leads to consistent performance drops, especially on the rare readmission task.
+
+\begin{table}[h]
+    \centering
+    \scriptsize
+    \begin{tabular}{lcccccc}
+        \toprule
+        & \multicolumn{2}{c}{Prolonged stay} & \multicolumn{2}{c}{Mortality} & \multicolumn{2}{c}{Readmission} \\
+        \cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}
+        Model & AUROC & AUPR & AUROC & AUPR & AUROC & AUPR \\
+        \midrule
+        Baseline GRU & \textbf{0.856} & \textbf{0.431} & \textbf{0.792} & \textbf{0.782} & \textbf{0.691} & \textbf{0.084} \\
+        No SupCon    & 0.847 & 0.399 & 0.772 & 0.771 & 0.583 & 0.056 \\
+        No Recon     & 0.843 & 0.403 & 0.781 & 0.765 & 0.653 & 0.067 \\
+        BCE only     & \textbf{0.857} & 0.409 & 0.779 & 0.770 & 0.583 & 0.064 \\
+        SupCon only  & --    & --    & --    & --    & --    & --    \\
+        \bottomrule
+    \end{tabular}
+    \caption{Ablation study: performance of BCE heads on the test set.}
+    \label{tab:ablation_bce}
+\end{table}
+
+\begin{table}[h]
+    \centering
+    \scriptsize
+    \begin{tabular}{lcccccc}
+        \toprule
+        & \multicolumn{2}{c}{Prolonged stay} & \multicolumn{2}{c}{Mortality} & \multicolumn{2}{c}{Readmission} \\
+        \cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}
+        Model & AUROC & AUPR & AUROC & AUPR & AUROC & AUPR \\
+        \midrule
+        Baseline GRU & \textbf{0.797} & \textbf{0.375} & \textbf{0.761} & \textbf{0.737} & \textbf{0.516} & \textbf{0.048} \\
+        No SupCon    & 0.758 & 0.299 & 0.750 & 0.722 & 0.500 & 0.045 \\
+        No Recon     & 0.766 & 0.326 & 0.749 & 0.717 & 0.501 & 0.043 \\
+        BCE only     & 0.792 & 0.320 & 0.739 & 0.715 & 0.521 & 0.051 \\
+        SupCon only  & 0.775 & 0.326 & 0.726 & 0.688 & 0.522 & \textbf{0.049} \\
+        \bottomrule
+    \end{tabular}
+    \caption{Ablation study: performance of KNN classification in the contrastive embedding space.}
+    \label{tab:ablation_knn}
+\end{table}
+
+\subsection{Evaluation Modes}
+
+Our model supports two distinct evaluation strategies:
+
+\paragraph{1. BCE head predictions (primary).}  
+The main approach is to use the outputs of the task-specific binary cross-entropy (BCE) heads. 
+These are optimized directly for predictive accuracy and probability calibration, and they consistently 
+yielded the best performance across AUROC, AUPR, and confusion matrix metrics.  
+This is the evaluation mode we report as the primary result in the main paper.  
+
+\paragraph{2. KNN in the embedding space (secondary).}  
+In addition, the model produces task-specific embeddings through the supervised contrastive heads. 
+By representing each patient in this space, predictions can be made using a $k$-nearest neighbors (KNN) 
+classifier: a patient’s outcome is inferred based on the majority label of its closest neighbors.  
+
+While KNN performance in this embedding space is generally lower than the BCE heads (as reported in 
+Appendix~\ref{app:ablations}), this method offers \textbf{unique interpretability advantages}. It allows us to 
+assess \textit{why} the model considers a patient at risk by explicitly identifying similar past patients 
+and their outcomes. This neighborhood-based reasoning can be particularly valuable for exploratory 
+analysis and as a complement to calibrated probability estimates.  
+
+\paragraph{Summary.}  
+In short, BCE head predictions provide the most reliable quantitative results, while KNN evaluation 
+in the embedding space offers a window into the relational structure of the learned representation, 
+highlighting clinically meaningful patient similarities.
+
+\subsection{Feature Importance: Methods and Full Results}
+
+\paragraph{Wrapper and model output.}
+We adapt the model for SHAP by exposing a task-specific forward pass that returns the probability 
+for a single outcome (mortality / prolonged stay / readmission). The wrapper (i) clones the trained model to CPU 
+and eval mode, (ii) concatenates the time-step mask as the last input channel, (iii) computes per-sample sequence 
+lengths from that mask, and (iv) returns $\sigma(\ell_{k})$ for the chosen task $k$ (probability). 
+For stability and determinism during SHAP calls, cuDNN is temporarily disabled around the forward pass.
+
+\paragraph{Background and evaluation sets.}
+We form SHAP’s background and evaluation tensors by drawing several balanced batches with our 
+\emph{Positive-per-Task} sampler (at least 6 positives per task per batch), using training data for background and test data for evaluation.
+
+\textbf{Evaluation was done using 3 main methods}:
+
+\begin{itemize}
+    \item \textbf{Global importance:} Global importance ranks features by \(\text{mean}_{\text{samples},\,t}\,|\text{SHAP}|\).  
+    \item \textbf{Temporal patterns (heatmaps):} We compute \(\text{mean}_{\text{samples}}\,|\text{SHAP}|\in\mathbb{R}^{T\times D}\) and display a feature\(\times\)time heatmap for the selected top-$20$ features. We observed the data both in absolute perspective to preserve importance magnitude overall and relative (row-wise 0–1 scaling) to highlight when a feature peaks.  
+    \item \textbf{Signed effects (beeswarm):} To summarize signed effects per feature across time, SHAP values are aggregated over the time axis (sum or mean), and a beeswarm plot is drawn on the same top-$20$ features, colored by the mean observed feature value across time.  
+\end{itemize}
+
+
+\subsection{Per-task results and plots}
+
+\paragraph{Notes on interpretability.}
+The global bars identify which features matter most overall for each task; the heatmaps indicate \emph{when} 
+they matter within the first 48\,h; and the beeswarms reveal the \emph{direction} and spread of effects. 
+Together, these complementary views help connect model predictions to clinically meaningful signals.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 
 \end{document}
+
+
+% This document was modified from the file originally made available by
+% Pat Langley and Andrea Danyluk for ICML-2K. This version was created
+% by Iain Murray in 2018, and modified by Alexandre Bouchard in
+% 2019 and 2021 and by Csaba Szepesvari, Gang Niu and Sivan Sabato in 2022.
+% Modified again in 2023 and 2024 by Sivan Sabato and Jonathan Scarlett.
+% Previous contributors include Dan Roy, Lise Getoor and Tobias
+% Scheffer, which was slightly modified from the 2010 version by
+% Thorsten Joachims & Johannes Fuernkranz, slightly modified from the
+% 2009 version by Kiri Wagstaff and Sam Roweis's 2008 version, which is
+% slightly modified from Prasad Tadepalli's 2007 version which is a
+% lightly changed version of the previous year's version by Andrew
+% Moore, which was in turn edited from those of Kristian Kersting and
+% Codrina Lauth. Alex Smola contributed to the algorithmic style files.
+
